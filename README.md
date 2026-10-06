@@ -54,11 +54,13 @@ Alternatively, `npm run build -- --base=/band/` uses Vite's command-line option.
 
 ### Cloudflare deployment from main
 
-Use **Cloudflare Workers Builds**, Cloudflare's built-in GitHub integration. Connect this repository to the Worker and set **`main`** as the production branch. Cloudflare then installs locked dependencies, runs the build command and deploys successful commits automatically. No GitHub Actions workflow or GitHub deployment secret is required.
+This repository is connected to **Cloudflare Workers Builds**, Cloudflare's built-in GitHub integration, with **`main`** as the production branch. Cloudflare installs locked dependencies, runs the build command and deploys successful commits automatically. No GitHub Actions workflow or GitHub deployment secret is required.
+
+Live app: [marching-band-trainer.p-devaney96.workers.dev](https://marching-band-trainer.p-devaney96.workers.dev/).
 
 `wrangler.json` targets **`marching-band-trainer`** in **Paddys Account**, account ID `4d7d280c95494925dda1b23cbb7ae0f8`. It serves `dist/` with Cloudflare Workers Static Assets and uses a `workers.dev` URL. There is no Worker script, server-side application code, custom domain or paid-plan change. Missing score/assets URLs return 404 rather than the app HTML. Production builds use the URL root (`VITE_BASE=/`).
 
-Configure the Worker in **Cloudflare → Workers & Pages → marching-band-trainer → Settings → Build**:
+Manage these settings in **Cloudflare → Workers & Pages → marching-band-trainer → Settings → Builds**:
 
 | Setting | Value |
 | --- | --- |
@@ -81,7 +83,7 @@ npm run deploy:check  # validates packaging without uploading or publishing
 npm run deploy       # publishes dist/ using Wrangler login or an API token
 ```
 
-The local Wrangler OAuth sign-in is separate from the Workers Builds token. Do not copy its access or refresh tokens into the repository or CI settings. `npm run deploy` publishes the existing `dist/`; rebuild first when deploying manually. Pushing a new score on `main` automatically regenerates the catalogue and publishes it after checks pass once the Git integration is connected. Build logs and deployment status are available in the Worker's **Builds** and **Deployments** tabs. To roll back, redeploy a previous version in Cloudflare or revert the change on `main` and let the pipeline publish it.
+The local Wrangler OAuth sign-in is separate from the Workers Builds token. Do not copy its access or refresh tokens into the repository or CI settings. `npm run deploy` publishes the existing `dist/`; rebuild first when deploying manually. Pushing a new score on `main` automatically regenerates the catalogue and publishes it after checks pass. Build logs and deployment status are available in the Worker's **Deployments** tab. To roll back, redeploy a previous version in Cloudflare or revert the change on `main` and let the pipeline publish it.
 
 ## Practice controls
 
