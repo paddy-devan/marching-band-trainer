@@ -50,7 +50,38 @@ VITE_BASE=/band/ npm run build
 VITE_BASE=/band/ npm run preview
 ```
 
-Alternatively, `npm run build -- --base=/band/` uses Vite's command-line option. All catalogue and score fetches respect the base URL; URLs with spaces are encoded. Configure the base before building. New repository scores require rebuilding and redeploying; the deployed app does not monitor a teacher's computer. No hosting or remote repository is created by this project.
+Alternatively, `npm run build -- --base=/band/` uses Vite's command-line option. All catalogue and score fetches respect the base URL; URLs with spaces are encoded. Configure the base before building. New repository scores require rebuilding and redeploying; the deployed app does not monitor a teacher's computer.
+
+### Cloudflare deployment from main
+
+Use **Cloudflare Workers Builds**, Cloudflare's built-in GitHub integration. Connect this repository to the Worker and set **`main`** as the production branch. Cloudflare then installs locked dependencies, runs the build command and deploys successful commits automatically. No GitHub Actions workflow or GitHub deployment secret is required.
+
+`wrangler.json` targets **`marching-band-trainer`** in **Paddys Account**, account ID `4d7d280c95494925dda1b23cbb7ae0f8`. It serves `dist/` with Cloudflare Workers Static Assets and uses a `workers.dev` URL. There is no Worker script, server-side application code, custom domain or paid-plan change. Missing score/assets URLs return 404 rather than the app HTML. Production builds use the URL root (`VITE_BASE=/`).
+
+Configure the Worker in **Cloudflare → Workers & Pages → marching-band-trainer → Settings → Build**:
+
+| Setting | Value |
+| --- | --- |
+| Git repository | `paddy-devan/marching-band-trainer` |
+| Production branch | `main` |
+| Root directory | Repository root (`/`) |
+| Build command | `npm run ci:build` |
+| Deploy command | `npm run deploy` |
+| Build environment variable | `NODE_VERSION=24` |
+| Build environment variable | `VITE_BASE=/` |
+| Non-production branch builds | Disabled |
+
+Cloudflare automatically installs dependencies using the committed `package-lock.json`. `ci:build` runs the parser and transport tests before type checking and building. Failed checks stop deployment. Use Cloudflare's generated Workers Builds token or an existing appropriately scoped deployment token; credentials stay in Cloudflare's build settings, never in frontend assets, source files or chat. See [Workers Builds configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/).
+
+Local checks and deployments:
+
+```sh
+npm run build
+npm run deploy:check  # validates packaging without uploading or publishing
+npm run deploy       # publishes dist/ using Wrangler login or an API token
+```
+
+The local Wrangler OAuth sign-in is separate from the Workers Builds token. Do not copy its access or refresh tokens into the repository or CI settings. `npm run deploy` publishes the existing `dist/`; rebuild first when deploying manually. Pushing a new score on `main` automatically regenerates the catalogue and publishes it after checks pass once the Git integration is connected. Build logs and deployment status are available in the Worker's **Builds** and **Deployments** tabs. To roll back, redeploy a previous version in Cloudflare or revert the change on `main` and let the pipeline publish it.
 
 ## Practice controls
 

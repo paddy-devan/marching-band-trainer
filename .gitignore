@@ -3,3 +3,9 @@ dist/
 public/generated/
 .DS_Store
 *.tsbuildinfo
+.wrangler/
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
