@@ -1,0 +1,26 @@
+{
+  "scores": {
+    "colonel-bogey": {
+      "parts": [
+        {
+          "part": "Bell Lyre",
+          "instrument": "piano",
+          "renderer": "lyre",
+          "register": { "min": 81, "max": 105, "transpose": 24, "provisional": true }
+        },
+        { "part": "Side Drum", "rollProfile": "repertoire" }
+      ]
+    },
+    "hollyrood": {
+      "parts": [
+        {
+          "part": "Bell Lyre",
+          "renderer": "lyre",
+          "register": { "min": 81, "max": 105, "transpose": 24, "provisional": true }
+        },
+        { "part": "Side Drum", "rollProfile": "repertoire" }
+      ]
+    },
+    "16obr": { "parts": [{ "part": "Side Drum", "rollProfile": "repertoire" }] }
+  }
+}

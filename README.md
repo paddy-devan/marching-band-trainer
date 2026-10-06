@@ -1,0 +1,139 @@
+# Marching Band Trainer
+
+A static practice app that reads original MuseScore archives, plays the parts together or separately, and follows one selected instrument. Built with React, TypeScript, Vite, `fflate` and native Web Audio. No backend, database, authentication, MuseScore process or MIDI exports are needed.
+
+## Run locally
+
+Use Node.js **22.12+ in the 22.x line, 24.x, or 26+**, and npm.
+
+```sh
+npm ci
+npm run dev
+```
+
+Open the local URL printed by Vite (normally http://127.0.0.1:5173/). Scores are prepared automatically before starting development. Serve the app over HTTP; opening `index.html` with `file://` is unsupported.
+
+```sh
+npm run typecheck
+npm test
+npm run build
+npm run preview
+```
+
+For browser tests, install Playwright's Chromium once:
+
+```sh
+npx playwright install chromium
+npm run test:e2e
+```
+
+Alternatively, use an installed Chrome with `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e`. The tests start the dev server automatically unless one is already running. To check a production preview or subpath instead, set `E2E_URL=http://127.0.0.1:4173/band/`. Temporary browser results and screenshots go to the system temporary directory; set `PLAYWRIGHT_OUTPUT_DIR` to change the results directory.
+
+## Add the next score
+
+1. Put a `.mscz` file into repository-root **`scores/`**. Keep filenames stable; they are application score IDs.
+2. Restart `npm run dev`, or run `npm run build` for production. `npm run scores` can also regenerate assets while the dev server is running; reload the browser afterwards.
+3. Check the title, parts, notation warnings and playback in the app. Configure unusual instruments if needed.
+
+The preparation script enumerates `.mscz` files automatically, copies the originals to `public/generated/scores/`, and creates a filename/URL catalogue. Content hashes in asset URLs prevent stale caches after score edits. The browser reads visible titles from the score XML and caches parsed scores for the session. Files load progressively: the first score is usable while the rest are read. Removing or changing a source file and rebuilding replaces the generated catalogue and assets. Teachers do not edit manifests, pitches or MIDI exports.
+
+`scores/` is canonical and belongs in Git. `public/generated/`, `node_modules/` and `dist/` are disposable and ignored. The three supplied files are preserved, including `hollyrood.mscz`, whose visible title is **Holyrood**.
+
+## Static deployment
+
+`npm run build` produces **`dist/`**, containing everything needed by a static HTTP host. Copy that directory to the host. No Node.js process is needed in production.
+
+For deployment under a subpath, configure Vite's base:
+
+```sh
+VITE_BASE=/band/ npm run build
+VITE_BASE=/band/ npm run preview
+```
+
+Alternatively, `npm run build -- --base=/band/` uses Vite's command-line option. All catalogue and score fetches respect the base URL; URLs with spaces are encoded. Configure the base before building. New repository scores require rebuilding and redeploying; the deployed app does not monitor a teacher's computer. No hosting or remote repository is created by this project.
+
+## Practice controls
+
+- Play/pause, restart, seek and change speed from 25–150%. Speed affects timing, not pitch.
+- Mute individual parts or solo one or more. Mute takes precedence over solo; multiple soloed parts play together. Gain nodes apply changes immediately to scheduled and current sounds.
+- Select **Follow** independently of the audio mix. Muted parts can still be visualised.
+- Read current/upcoming pitches or sticking, bar and beat. Multiple pitches at the same position display together. Compound meters such as 12/8 count dotted-crotchet beats; the tempo label still uses crotchet BPM from the score.
+- Choose score spelling, sharp labels or flat labels. Octaves remain distinct. Key signatures show both possible relative keys unless the score explicitly declares a mode.
+- Controls use native keyboard interactions and large touch targets. Reduced-motion preferences keep highlights and note labels while disabling stick movement and the mallet overlay.
+
+Audio starts after pressing Play. The transport uses the Web Audio clock with a short lookahead, and visual state derives from that clock. Pause, seek, speed changes, restart and score changes cancel scheduled sources. A suspended audio context pauses the transport and prompts the student to press Play again. Skipped scheduling windows after background-tab delays do not replay old attacks in a burst.
+
+## Instrument and interpretation configuration
+
+Edit **`trainer.config.json`** only for exceptions. Do not duplicate titles, tempo, keys or note sequences. Each entry uses the score filename without `.mscz`, an exact visible part name, and optionally the native instrument ID:
+
+```json
+{
+  "scores": {
+    "colonel-bogey": {
+      "parts": [
+        {
+          "part": "Bell Lyre",
+          "instrument": "piano",
+          "renderer": "lyre",
+          "register": {
+            "min": 81,
+            "max": 105,
+            "transpose": 24,
+            "provisional": true
+          }
+        },
+        { "part": "Side Drum", "rollProfile": "repertoire" }
+      ]
+    }
+  }
+}
+```
+
+Renderers are `lyre`, `snare` and `pulse`. Lyre range limits are MIDI sounding pitches. `transpose` is the semitone offset from the stored score pitch, used for both synthesised audio and bar highlighting. Out-of-range notes are identified rather than mapped to another octave.
+
+The supplied photograph establishes 25 chromatic bars spanning A–A, with naturals on the right, accidentals on the left, increasing upwards. The **A5–A7 sounding range and +24-semitone mapping are provisional**, chosen with user approval. Comparable instruments use that range ([Musser catalogue](https://www.ludwig-drums.com/application/files/7214/6531/8332/AV8084_2013.pdf)); it is not a verified measurement of this Mayfield instrument. Colonel Bogey's stored C4–F5 pitches map to C6–F7. The same provisional register is configured for Holyrood. Adjust the mapping after checking the real instrument with a tuner. Bar positions use diatonic spacing with accidentals staggered between the naturals.
+
+Part IDs use `score-id:normalised-part-name:instrument-id`. Duplicates receive a document-order suffix and a warning. Staffs retain their native IDs, or their document-order IDs where the definition omits them; a part can contain several staffs. Overrides must resolve to exactly one part; unresolved or ambiguous selectors produce warnings. Renaming a part or changing its instrument requires updating its override. MuseScore online IDs and revision metadata are never used as local part IDs.
+
+Sticking priority is explicit position-anchored annotation, named drum mapping, configured staff-line mapping, then unspecified. `positionHands: { "upper": "R", "lower": "L" }` can be configured when drum definitions contain usable signed staff lines (negative = above, positive = below). Explicit annotations win over conflicting mappings and generate a warning. Repeated same-hand strokes and rests retain the written rhythm. **Unspecified sticking uses a neutral central strike and no animated left/right stick.** Audio still plays. Missing sticking is summarised once per snare part.
+
+`rollProfile` options:
+
+- `repertoire` (default): semiquaver hand movements in simple time; quaver movements in 12/8.
+- `sixteenth`: semiquaver movements regardless of meter.
+- `eighth`: quaver movements regardless of meter.
+- `disabled`: do not expand rolls; show a notation warning.
+
+Supported snare roll marks are `r16` and `r32`. Slash count does not set the hand-change rate. Tied roll segments join before expansion; phase continues across bar lines over a half-open span with no duplicate boundary or extra final attack. Unknown starting hands remain unspecified. The first version approximates roll audio with **two decaying noise contacts per skeleton movement**, generated separately from hand movements. Other tremolos are warned about and play as single events.
+
+Pitched audio uses decaying triangle oscillators. Bass drum uses a decaying low sine, and snare uses high-passed noise. Left and right snare identifiers use the same sound. These are approximate practice sounds, not MuseScore or Muse Sounds reproduction. The configuration's register transpose is separate from tempo/speed, and is never inferred by forcing every score into the instrument range.
+
+## Supported notation and limitations
+
+Verified native format: **MuseScore XML 4.70**, from the supplied `.mscz` fixtures. Other numeric 4.x versions are attempted with a warning; other major versions are rejected. Archive decoding follows `META-INF/container.xml`, then falls back only to a unique suitable root-level `.mscx`. Malformed or ambiguous archives are reported per file without preventing other scores from loading. Archive and selected XML size are limited to 20 MB.
+
+Supported: standard durations through 1024ths, dots, full-measure rests, explicit pickup lengths, rests, chords, multiple voices and staffs, numeric tempo changes across parts, key/time-signature changes, native note pitch and `tpc` spelling, position-anchored single R/L sticking, named drum hands, accents, native next/prev tie locations, and the repertoire's single-chord snare rolls. Exact rational quarter-note units are retained until conversion through the shared tempo map.
+
+Not yet faithfully interpreted:
+
+- Repeats, volta endings, jumps and measure repeats: **one pass through the written bars**. Colonel Bogey has repeat endings, so the app displays a persistent single-pass notice.
+- Tuplets: detected and warned; ordinary written durations are used as an approximation.
+- Grace notes: detected and omitted.
+- Instrument changes, octave spanners and two-chord tremolos: detected and warned; stored pitches remain the playback source.
+- Compressed multimeasure rests, cross-measure voice locations and mid-bar time-signature changes: limited; warnings explain affected cases.
+- Dynamics beyond accents, articulations, fermatas and swing are not interpreted. Single-contact percussion sounds decay naturally rather than sustain for the full written duration.
+- Tied rolls changing meter preserve the initial skeleton interval and warn. Invalid tie relationships play separately with a warning.
+
+The visible instrument renderer is a replaceable SVG placeholder, not a full sheet-music engraver. A physical instrument's octave, sound quality, and real-phone audio behaviour need user/device verification.
+
+## Code structure and checks
+
+- `scripts/prepare-scores.mjs`: reproducible static assets and catalogue.
+- `src/score/archive.ts`, `xml.ts`, `parser.ts`, `fraction.ts`, `model.ts`: decoding, ordered parsing and exact score model.
+- `src/score/interpret.ts`: native tie joins, roll skeletons, tempo conversion and separate audio contacts.
+- `src/audio/transport.ts`: audio-clock scheduling, cancellation and per-part mixing.
+- `src/ui/`: catalogue, transport/part controls, practice screen and instrument renderers. Renderers consume normalised movements rather than native XML.
+- `tests/`: fixture/synthetic notation tests, catalogue regeneration, deterministic transport tests and real-browser interaction checks.
+
+Automated checks cover the 43 resolved side-drum notes in 16 OBR, 12 explicit sticking annotations and 24 roll marks in Colonel Bogey, the tied minim-plus-quaver's ten movements, three-note tie chains, dotted 12/8 rolls, shared tempo changes, spelling/octaves, multi-staff/voice alignment, unresolved configuration, archive errors, cancellations, immediate gains and real UI state. Browser QA uses desktop and emulated phone/tablet widths; this does not establish compatibility with actual iOS/Android hardware. An analyser verifies nonzero Web Audio output and silence after muting; sound quality has not been listened to.
