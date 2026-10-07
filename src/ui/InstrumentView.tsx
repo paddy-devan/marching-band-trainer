@@ -1,16 +1,16 @@
 import { memo } from 'react';
 import type { Movement, Part } from '../score/model';
-import { pitchLabel, type Spelling } from '../score/labels';
+import { pitchLabel } from '../score/labels';
 
-export function movementLabel(m: Movement, part: Part, spelling: Spelling) {
-  if (!m.percussion) return pitchLabel(m.pitch + part.register.transpose, m.tpc, spelling);
+export function movementLabel(m: Movement, part: Part) {
+  if (!m.percussion) return pitchLabel(m.pitch + part.register.transpose, m.tpc, 'sharps');
   if (part.renderer === 'snare') return m.roll ? `Roll ${m.hand || '—'}` : m.hand || '—';
   return 'Strike';
 }
-type Props = { part: Part; active: Movement[]; spelling: Spelling; position: number };
+type Props = { part: Part; active: Movement[]; position: number };
 
-export const InstrumentView = memo(function InstrumentView({ part, active, spelling, position }: Props) {
-  if (part.renderer === 'lyre') return <Lyre part={part} active={active} spelling={spelling} />;
+export const InstrumentView = memo(function InstrumentView({ part, active, position }: Props) {
+  if (part.renderer === 'lyre') return <Lyre part={part} active={active} />;
   if (part.renderer === 'snare') return <Snare active={active} position={position} />;
   return <svg viewBox="0 0 480 360" role="img" aria-label={`${part.name}: ${active.length ? 'strike' : 'rest'}`} className="instrument-svg pulse">
     <circle cx="240" cy="175" r="120" className="drum-shell" />
@@ -37,7 +37,7 @@ export function lyreBars(part: Part) {
   }
   return bars;
 }
-function Lyre({ part, active, spelling }: Omit<Props, 'position'>) {
+function Lyre({ part, active }: Omit<Props, 'position'>) {
   const bars = lyreBars(part);
   const pitches = new Set(active.map(m => m.pitch + part.register.transpose));
   const hit = bars.find(b => pitches.has(b.pitch));
@@ -49,7 +49,7 @@ function Lyre({ part, active, spelling }: Omit<Props, 'position'>) {
       {bars.map(b => <g key={b.pitch}>
         <rect x={b.x} y={b.y} width={b.width} height="19" rx="3" className={`lyre-bar ${pitches.has(b.pitch) ? 'lit' : ''}`} />
         <circle cx={b.x + 9} cy={b.y + 9.5} r="2" className="bar-pin" />
-        <text x={b.x + b.width - 9} y={b.y + 13} textAnchor="end" className="bar-letter">{pitchLabel(b.pitch, undefined, spelling === 'score' ? 'sharps' : spelling)}</text>
+        <text x={b.x + b.width - 9} y={b.y + 13} textAnchor="end" className="bar-letter">{pitchLabel(b.pitch, undefined, 'sharps')}</text>
       </g>)}
       {hit ? <g className="mallet"><line x1={hit.x + 40} y1={hit.y + 7} x2={hit.x + 2} y2={hit.y - 52} /><circle cx={hit.x + 40} cy={hit.y + 7} r="8" /></g> : null}
       <text x="142" y="531" textAnchor="middle" className="column-label">Accidentals</text>

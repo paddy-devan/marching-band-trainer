@@ -39,7 +39,9 @@ describe('actual source scores', () => {
     expect(keyLabel(-5)).toBe('5 flats · D♭ major / B♭ minor');
     expect(score.parts[0].renderer).toBe('lyre');
     expect(score.parts[0].register).toMatchObject({ min: 81, max: 105, transpose: 24 });
-    expect(score.warnings.some(w => /Repeats/.test(w))).toBe(true);
+    expect(score.repeats).toEqual([{ start: 2, end: 9, count: 2 }]);
+    expect(score.endings.map(e => [e.start, e.end, e.passes])).toEqual([[6, 10, [1]], [10, 11, [2]]]);
+    expect(score.warnings.some(w => /Repeats/.test(w))).toBe(false);
     expect(score.warnings.filter(w => /unspecified sticking/.test(w))).toHaveLength(1);
   });
   it('also loads the extra 12/8 score from the source directory', () => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Transport, type Mix } from '../audio/transport';
 import type { Timeline } from '../score/model';
-import { keyLabel, pitchLabel, type Spelling } from '../score/labels';
+import { keyLabel } from '../score/labels';
 import { positionAt } from '../score/interpret';
 import { value } from '../score/fraction';
 import { InstrumentView, movementLabel } from './InstrumentView';
@@ -13,7 +13,6 @@ export function Practice({ timeline }: { timeline: Timeline }) {
   const [transport] = useState(() => new Transport(timeline));
   const state = useSyncExternalStore(transport.subscribe, transport.getSnapshot);
   const [selected, setSelected] = useState(score.parts[0].id);
-  const [spelling, setSpelling] = useState<Spelling>('score');
   const [mix, setMix] = useState<Mix>(() => Object.fromEntries(score.parts.map(p => [p.id, { muted: false, solo: false }])));
   useEffect(() => () => transport.dispose(), [transport]);
   const changeMix = (next: Mix) => { transport.setMix(next); setMix(next); };
@@ -24,10 +23,10 @@ export function Practice({ timeline }: { timeline: Timeline }) {
   const upcoming: { time: number; labels: string[]; roll: boolean }[] = [];
   for (const movement of future) {
     const previous = upcoming.at(-1);
-    if (previous && Math.abs(previous.time - movement.time) < 1e-8) previous.labels.push(movementLabel(movement, part, spelling));
+    if (previous && Math.abs(previous.time - movement.time) < 1e-8) previous.labels.push(movementLabel(movement, part));
     else {
       if (upcoming.length >= 6) break;
-      upcoming.push({ time: movement.time, labels: [movementLabel(movement, part, spelling)], roll: movement.roll });
+      upcoming.push({ time: movement.time, labels: [movementLabel(movement, part)], roll: movement.roll });
     }
   }
   const beats = positionAt(score, state.position);
@@ -37,29 +36,22 @@ export function Practice({ timeline }: { timeline: Timeline }) {
   const key = score.keys.filter(k => k.partId === part.id && value(k.position) <= beats).at(-1);
   const tempo = score.tempos.filter(t => value(t.position) <= beats).at(-1) || score.tempos[0];
   return <main className="practice">
-    <header className="piece-heading"><h1>{score.title}</h1><p>{score.composer || 'Marching band practice'}</p>
-      <div className="piece-meta"><span>{measure.signature.numerator}/{measure.signature.denominator} time</span><span>♩ = {Math.round(score.tempos[0].bpm)}</span><span>{score.measures.length} bars</span></div>
+    <header className="piece-heading"><h1>{score.title}</h1>{score.composer ? <p>{score.composer}</p> : null}
+      <div className="piece-meta"><span>{measure.signature.numerator}/{measure.signature.denominator} time</span><span>{score.writtenMeasureCount || score.measures.length} bars</span></div>
     </header>
     <div className="practice-grid">
       <section className="visual-panel" aria-labelledby="visual-title">
-        <div className="visual-heading"><div><h2 id="visual-title">{part.name}</h2><p>{part.percussion ? 'Follow the rhythm' : 'Follow the melody'}</p></div>
-          {!part.percussion ? <div className="spelling-control"><label htmlFor="spelling">Note labels</label><select id="spelling" value={spelling} onChange={e => setSpelling(e.target.value as Spelling)}><option value="score">Score spelling</option><option value="sharps">Sharps</option><option value="flats">Flats</option></select></div> : null}
-        </div>
+        <div className="visual-heading"><h2 id="visual-title">{part.name}</h2></div>
         {key ? <p className="key-signature">{keyLabel(key.fifths, key.mode)}</p> : null}
-        <div className="instrument-stage"><InstrumentView part={part} active={active} spelling={spelling} position={state.position} /></div>
-        <div className="current-note"><span>Now</span><strong>{active.length ? [...new Set(active.map(m => movementLabel(m, part, spelling)))].join(' + ') : state.position >= timeline.duration ? 'Finished' : 'Rest'}</strong><small>{part.percussion ? active.some(m => !m.hand) && part.renderer === 'snare' ? 'Sticking unspecified' : active.some(m => m.roll) ? 'Alternating roll movements' : 'Written rhythm' : 'Sounding pitch'}</small></div>
+        <div className="instrument-stage"><InstrumentView part={part} active={active} position={state.position} /></div>
+        <div className="current-note"><span>Now</span><strong>{active.length ? [...new Set(active.map(m => movementLabel(m, part)))].join(' + ') : state.position >= timeline.duration ? 'Finished' : 'Rest'}</strong></div>
         <div className="upcoming"><span>Coming up</span><ol>{upcoming.map((group, i) => <li key={`${group.time}:${i}`} className={group.roll ? 'roll-note' : ''}>{group.labels.join(' + ')}</li>)}</ol>{!upcoming.length ? <p>End of part</p> : null}</div>
-        {part.renderer === 'lyre' && part.register.provisional ? <p className="register-note">Provisional range: {pitchLabel(part.register.min)}–{pitchLabel(part.register.max)} · score mapped {part.register.transpose >= 0 ? '+' : ''}{part.register.transpose} semitones.</p> : null}
       </section>
       <div className="control-column">
-        <TransportControls transport={transport} state={state} timeline={timeline} bar={measure.index + 1} beat={beat} />
-        <div className="practice-tip"><h2>Find your tempo.</h2><p>Slow it down, learn the pattern, then bring the band back in.</p><span>Playing at ♩ = {Math.round(tempo.bpm * state.speed)}</span></div>
+        <TransportControls transport={transport} state={state} timeline={timeline} bar={(measure.sourceIndex ?? measure.index) + 1} beat={beat} bpm={tempo.bpm}>
+          <PartControls parts={score.parts} selected={selected} onSelect={setSelected} mix={mix} onMix={changeMix} />
+        </TransportControls>
       </div>
     </div>
-    <PartControls parts={score.parts} selected={selected} onSelect={setSelected} mix={mix} onMix={changeMix} />
-    <footer className="practice-footer"><p>Practice audio uses simple synthesised sounds.</p>
-      {timeline.warnings.length ? <details className="score-notes"><summary>Score notes & limitations ({timeline.warnings.length})</summary><ul>{timeline.warnings.map(w => <li key={w}>{w}</li>)}</ul></details> : null}
-      {timeline.warnings.some(w => w.startsWith('Repeats')) ? <p className="linear-notice">Single-pass playback · repeats and endings are not expanded.</p> : null}
-    </footer>
   </main>;
 }

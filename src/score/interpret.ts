@@ -1,5 +1,6 @@
 import { add, compare, fraction, mul, sub, value, ZERO, type Fraction } from './fraction';
 import type { Movement, Part, Score, Timeline, WrittenNote } from './model';
+import { expandRepeats } from './repeats';
 
 export function secondsAt(score: Score, position: Fraction): number {
   let seconds = 0;
@@ -27,6 +28,7 @@ export function rollInterval(score: Score, n: WrittenNote, part: Part): Fraction
   return sig.numerator === 12 && sig.denominator === 8 ? fraction(1, 2) : fraction(1, 4);
 }
 export function interpretScore(score: Score): Timeline {
+  score = expandRepeats(score);
   const warnings = [...score.warnings];
   const warn = (message: string) => { if (!warnings.includes(message)) warnings.push(message); };
   const byId = new Map(score.notes.map(n => [n.id, n]));
@@ -72,7 +74,7 @@ export function interpretScore(score: Score): Timeline {
         seconds: secondsAt(score, add(position, duration)) - time,
         pitch: note.pitch, tpc: note.tpc, percussion: note.percussion, hand,
         provenance: note.provenance, roll, velocity: note.velocity,
-        sourceIds: chain.map(n => n.id), sourceId: source.id,
+        sourceIds: chain.map(n => n.sourceId || n.id), sourceId: source.sourceId || source.id,
       });
       if (!roll) break;
     }

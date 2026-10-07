@@ -12,7 +12,9 @@ export type Part = {
   positionHands?: { upper: Hand; lower: Hand };
 };
 export type Signature = { numerator: number; denominator: number };
-export type Measure = { index: number; start: Fraction; duration: Fraction; signature: Signature };
+export type Measure = { index: number; sourceIndex?: number; start: Fraction; duration: Fraction; signature: Signature };
+export type Repeat = { start: number; end: number; count: number };
+export type Ending = { start: number; end: number; passes: number[]; repeat: number };
 export type TieLocation = { measures: number; fraction: Fraction; voices: number; staves: number };
 export type WrittenNote = {
   id: string; partId: string; staffId: string; voice: number; measure: number;
@@ -20,6 +22,7 @@ export type WrittenNote = {
   pitch: number; tpc?: number; percussion: boolean;
   hand?: Hand; provenance: Provenance; tremolo?: string; velocity: number;
   tieNext?: TieLocation; tiePrev?: TieLocation;
+  sourceId?: string;
 };
 export type Score = {
   id: string; version: string; title: string; composer?: string; parts: Part[]; measures: Measure[];
@@ -29,6 +32,7 @@ export type Score = {
   keys: { partId: string; position: Fraction; fifths: number; mode?: string }[];
   signatures: { position: Fraction; signature: Signature }[];
   warnings: string[]; duration: Fraction;
+  repeats: Repeat[]; endings: Ending[]; writtenMeasureCount?: number;
 };
 export type Movement = {
   id: string; partId: string; position: Fraction; duration: Fraction;

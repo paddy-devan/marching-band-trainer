@@ -2,6 +2,7 @@ import { add, compare, fraction, key, mul, nativeFraction, sub, ZERO, type Fract
 import { applyConfig, type TrainerConfig } from './config';
 import type { Hand, Measure, Part, Score, Signature, TieLocation, WrittenNote } from './model';
 import { child, children, number, parseXml, text } from './xml';
+import { readRepeats } from './repeats';
 
 const slug = (name: string) => name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'part';
 const durations: Record<string, Fraction> = {
@@ -92,8 +93,8 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
   applyConfig(id, parts, warnings, customConfig);
 
   const all = Array.from(node.getElementsByTagName('*'));
-  if (all.some(e => ['startRepeat', 'endRepeat', 'Jump', 'Marker', 'RepeatMeasure'].includes(e.localName) || (e.localName === 'Spanner' && e.getAttribute('type') === 'Volta')))
-    warn('Repeats, endings and jumps are not expanded. Playback follows the written bars once, in order.');
+  if (all.some(e => ['Jump', 'Marker', 'RepeatMeasure'].includes(e.localName)))
+    warn('Navigation jumps and measure-repeat symbols are not interpreted.');
   if (all.some(e => e.localName === 'Tuplet')) warn('Tuplets are not interpreted yet; their written durations are approximate.');
   if (all.some(e => /grace|acciaccatura|appoggiatura/i.test(e.localName))) warn('Grace notes are omitted from playback.');
   if (all.some(e => ['InstrumentChange', 'Ottava', 'TremoloTwoChord', 'MeasureRepeat'].includes(e.localName) || (e.localName === 'Spanner' && e.getAttribute('type') === 'Ottava')))
@@ -101,6 +102,7 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
   const staffMeasures = staffs.map(s => children(s, 'Measure'));
   const count = Math.max(...staffMeasures.map(ms => ms.length));
   if (!count) throw new Error('The score has no measures.');
+  const { repeats, endings } = readRepeats(staffMeasures);
   if (staffMeasures.some(ms => ms.length !== count)) warn('Staff measure counts differ; missing measures are treated as silence. Multimeasure-rest compression is not expanded.');
   const measures: Measure[] = [];
   let signature: Signature = { numerator: 4, denominator: 4 };
@@ -259,5 +261,5 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
     if (missing) warn(`${part.name}: ${missing} written notes have unspecified sticking. Neutral strikes are shown; no hand is invented.`);
   }
   const end = notes.reduce((max, n) => compare(add(n.position, n.duration), max) > 0 ? add(n.position, n.duration) : max, position);
-  return { id, version, title, composer, parts, measures, notes, rests, ties, tempos, keys, signatures, warnings, duration: end };
+  return { id, version, title, composer, parts, measures, notes, rests, ties, tempos, keys, signatures, warnings, duration: end, repeats, endings };
 }

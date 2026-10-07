@@ -33,7 +33,7 @@ Alternatively, use an installed Chrome with `PLAYWRIGHT_CHANNEL=chrome npm run t
 
 1. Put a `.mscz` file into repository-root **`scores/`**. Keep filenames stable; they are application score IDs.
 2. Restart `npm run dev`, or run `npm run build` for production. `npm run scores` can also regenerate assets while the dev server is running; reload the browser afterwards.
-3. Check the title, parts, notation warnings and playback in the app. Configure unusual instruments if needed.
+3. Check the title, parts and playback in the app. Configure unusual instruments if needed.
 
 The preparation script enumerates `.mscz` files automatically, copies the originals to `public/generated/scores/`, and creates a filename/URL catalogue. Content hashes in asset URLs prevent stale caches after score edits. The browser reads visible titles from the score XML and caches parsed scores for the session. Files load progressively: the first score is usable while the rest are read. Removing or changing a source file and rebuilding replaces the generated catalogue and assets. Teachers do not edit manifests, pitches or MIDI exports.
 
@@ -87,11 +87,11 @@ The local Wrangler OAuth sign-in is separate from the Workers Builds token. Do n
 
 ## Practice controls
 
-- Play/pause, restart, seek and change speed from 25–150%. Speed affects timing, not pitch.
+- Play/pause, restart, seek and change speed from 25–150%. The tempo control shows both the current crotchet BPM and the speed percentage. Speed affects timing, not pitch.
 - Mute individual parts or solo one or more. Mute takes precedence over solo; multiple soloed parts play together. Gain nodes apply changes immediately to scheduled and current sounds.
-- Select **Follow** independently of the audio mix. Muted parts can still be visualised.
+- Use the eye icon to select the visualised part independently of the audio mix. The speaker icon mutes a part; the headphones icon solos it. All part controls are in the playback panel. Muted parts can still be visualised.
 - Read current/upcoming pitches or sticking, bar and beat. Multiple pitches at the same position display together. Compound meters such as 12/8 count dotted-crotchet beats; the tempo label still uses crotchet BPM from the score.
-- Choose score spelling, sharp labels or flat labels. Octaves remain distinct. Key signatures show both possible relative keys unless the score explicitly declares a mode.
+- Note labels always use sharps to match the bell lyre. Octaves remain distinct. Key signatures show both possible relative keys unless the score explicitly declares a mode.
 - Controls use native keyboard interactions and large touch targets. Reduced-motion preferences keep highlights and note labels while disabling stick movement and the mallet overlay.
 
 Audio starts after pressing Play. The transport uses the Web Audio clock with a short lookahead, and visual state derives from that clock. Pause, seek, speed changes, restart and score changes cancel scheduled sources. A suspended audio context pauses the transport and prompts the student to press Play again. Skipped scheduling windows after background-tab delays do not replay old attacks in a burst.
@@ -136,9 +136,9 @@ Sticking priority is explicit position-anchored annotation, named drum mapping, 
 - `repertoire` (default): semiquaver hand movements in simple time; quaver movements in 12/8.
 - `sixteenth`: semiquaver movements regardless of meter.
 - `eighth`: quaver movements regardless of meter.
-- `disabled`: do not expand rolls; show a notation warning.
+- `disabled`: do not expand rolls; keep a parser diagnostic.
 
-Supported snare roll marks are `r16` and `r32`. Slash count does not set the hand-change rate. Tied roll segments join before expansion; phase continues across bar lines over a half-open span with no duplicate boundary or extra final attack. Unknown starting hands remain unspecified. The first version approximates roll audio with **two decaying noise contacts per skeleton movement**, generated separately from hand movements. Other tremolos are warned about and play as single events.
+Supported snare roll marks are `r16` and `r32`. Slash count does not set the hand-change rate. Tied roll segments join before expansion; phase continues across bar lines over a half-open span with no duplicate boundary or extra final attack. Unknown starting hands remain unspecified. The first version approximates roll audio with **two decaying noise contacts per skeleton movement**, generated separately from hand movements. Other tremolos play as single events; parser diagnostics remain available on the timeline model.
 
 Pitched audio uses decaying triangle oscillators. Bass drum uses a decaying low sine, and snare uses high-passed noise. Left and right snare identifiers use the same sound. These are approximate practice sounds, not MuseScore or Muse Sounds reproduction. The configuration's register transpose is separate from tempo/speed, and is never inferred by forcing every score into the instrument range.
 
@@ -146,11 +146,11 @@ Pitched audio uses decaying triangle oscillators. Bass drum uses a decaying low 
 
 Verified native format: **MuseScore XML 4.70**, from the supplied `.mscz` fixtures. Other numeric 4.x versions are attempted with a warning; other major versions are rejected. Archive decoding follows `META-INF/container.xml`, then falls back only to a unique suitable root-level `.mscx`. Malformed or ambiguous archives are reported per file without preventing other scores from loading. Archive and selected XML size are limited to 20 MB.
 
-Supported: standard durations through 1024ths, dots, full-measure rests, explicit pickup lengths, rests, chords, multiple voices and staffs, numeric tempo changes across parts, key/time-signature changes, native note pitch and `tpc` spelling, position-anchored single R/L sticking, named drum hands, accents, native next/prev tie locations, and the repertoire's single-chord snare rolls. Exact rational quarter-note units are retained until conversion through the shared tempo map.
+Supported: repeat barlines, repeat counts, nested repeats and multi-bar/multi-pass volta endings; standard durations through 1024ths, dots, full-measure rests, explicit pickup lengths, rests, chords, multiple voices and staffs, numeric tempo changes across parts, key/time-signature changes, native note pitch and `tpc` spelling, position-anchored single R/L sticking, named drum hands, accents, native next/prev tie locations, and the repertoire's single-chord snare rolls. Exact rational quarter-note units are retained until conversion through the shared tempo map.
 
 Not yet faithfully interpreted:
 
-- Repeats, volta endings, jumps and measure repeats: **one pass through the written bars**. Colonel Bogey has repeat endings, so the app displays a persistent single-pass notice.
+- Navigation jumps (D.C./D.S., Coda/Fine) and measure-repeat symbols are not expanded. Repeat barlines and volta endings are expanded before playback, including Colonel Bogey’s first and second endings.
 - Tuplets: detected and warned; ordinary written durations are used as an approximation.
 - Grace notes: detected and omitted.
 - Instrument changes, octave spanners and two-chord tremolos: detected and warned; stored pitches remain the playback source.
@@ -164,6 +164,7 @@ The visible instrument renderer is a replaceable SVG placeholder, not a full she
 
 - `scripts/prepare-scores.mjs`: reproducible static assets and catalogue.
 - `src/score/archive.ts`, `xml.ts`, `parser.ts`, `fraction.ts`, `model.ts`: decoding, ordered parsing and exact score model.
+- `src/score/repeats.ts`: repeat/ending order, shared playback expansion, tempo/key restoration and ties across adjacent played bars. Written bar numbers remain visible while seek/time use the expanded duration. Expansion is bounded to 10,000 bars and 200,000 notes.
 - `src/score/interpret.ts`: native tie joins, roll skeletons, tempo conversion and separate audio contacts.
 - `src/audio/transport.ts`: audio-clock scheduling, cancellation and per-part mixing.
 - `src/ui/`: catalogue, transport/part controls, practice screen and instrument renderers. Renderers consume normalised movements rather than native XML.

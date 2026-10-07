@@ -37,9 +37,9 @@ export default function App() {
   }, []);
   const timeline = items.find(item => item.entry.id === selected)?.timeline;
   return <>
-    <header className="app-header"><a href={import.meta.env.BASE_URL} className="brand" aria-label="Marching Band Trainer home"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span><span>Marching Band <strong>Trainer</strong></span></a><span className="header-note">One part at a time.</span></header>
+    <header className="app-header"><a href={import.meta.env.BASE_URL} className="brand" aria-label="Marching Band Trainer home"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span><span>Marching Band <strong>Trainer</strong></span></a></header>
     <div className="app-layout"><Catalogue items={items} selected={selected} onSelect={setSelected} query={query} onQuery={setQuery} loading={loading} error={error} />
-      {timeline ? <Practice key={timeline.score.id} timeline={timeline} /> : <main className="empty-state"><h1>{loading ? 'Getting the band ready…' : 'Your next practice starts here.'}</h1><p>{loading ? 'Reading the original MuseScore files.' : 'Choose a score from the catalogue to begin.'}</p></main>}
+      {timeline ? <Practice key={timeline.score.id} timeline={timeline} /> : <main className="empty-state"><h1>{loading ? 'Loading scores…' : 'Select a score'}</h1></main>}
     </div>
   </>;
 }

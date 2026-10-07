@@ -22,12 +22,11 @@ export function Catalogue({ items, query, onQuery, selected, onSelect, loading, 
         <button className={`score-choice ${selected === entry.id ? 'selected' : ''}`} onClick={() => onSelect(entry.id)} disabled={!timeline} aria-pressed={selected === entry.id}>
           <span className="score-icon" aria-hidden="true">♫</span>
           <span><strong>{timeline?.score.title || entry.id.replace(/[-_]/g, ' ')}</strong>
-            <small>{scoreError ? 'Could not load' : timeline ? `${timeline.score.measures.length} bars · ${timeline.score.parts.length} parts` : 'Reading score…'}</small></span>
+            <small>{scoreError ? 'Could not load' : timeline ? `${timeline.score.writtenMeasureCount || timeline.score.measures.length} bars · ${timeline.score.parts.length} parts` : 'Reading score…'}</small></span>
           {selected === entry.id ? <span className="selected-dot" aria-hidden="true" /> : null}
         </button>
         {scoreError ? <p className="score-error" role="alert">{entry.filename}: {scoreError}</p> : null}
       </div>)}
     </div>
-    <p className="catalogue-note">A little practice.<br />A stronger performance.</p>
   </aside>;
 }
