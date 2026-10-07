@@ -23,6 +23,16 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .brand strong { font-weight: 800; }
 .brand-mark { display: block; width: 36px; height: 40px; flex-shrink: 0; background: #fff; -webkit-mask: url('./assets/band-wave.svg') center / contain no-repeat; mask: url('./assets/band-wave.svg') center / contain no-repeat; mask-mode: alpha; }
 .app-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: calc(100vh - 80px); max-width: 1600px; margin: auto; }
+.score-landing-layout { display: block; }
+.score-landing { width: 100%; max-width: 680px; margin: 0 auto; padding: 40px 24px; }
+.score-landing-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.score-landing-heading h1 { font-weight: 600; }
+.score-landing-heading > span { color: var(--muted); font-size: 14px; }
+.score-landing .search-field input { font-size: 16px; }
+.score-landing .score-list { margin-top: 20px; }
+.score-landing .score-choice { align-items: center; min-height: 52px; padding: 12px; border-color: var(--line); }
+.score-landing .score-choice > span:nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
+.score-landing .score-choice strong { font-size: 15px; }
 .catalogue { padding: 30px 18px; border-right: 1px solid var(--line); background: var(--surface); min-width: 0; }
 .catalogue-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .catalogue-heading h2 { font-size: 17px; }.catalogue-heading > span { color: var(--muted); font-size: 13px; }
@@ -109,6 +119,7 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
 }
 @media (max-width: 720px) {
   .app-header { height: 70px; padding: 0 20px; }.brand { font-size: 17px; gap: 11px; }.app-layout { display: block; }
+  .score-landing { padding: 28px 20px; }
   .catalogue { display: none; }
   .mobile-score-switcher { display: flex; align-items: center; gap: 16px; justify-content: space-between; padding: 16px 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
   .mobile-score-switcher > div { min-width: 0; }

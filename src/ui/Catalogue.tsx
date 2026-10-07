@@ -4,19 +4,20 @@ import type { CatalogueEntry, Timeline } from '../score/model';
 export type CatalogueItem = { entry: CatalogueEntry; timeline?: Timeline; error?: string };
 type Props = {
   items: CatalogueItem[]; query: string; onQuery: (value: string) => void;
-  selected?: string; onSelect: (id: string) => void; loading: boolean; error?: string;
+  selected?: string; onSelect: (id: string) => void; loading: boolean; error?: string; landing?: boolean;
 };
-export function Catalogue({ items, query, onQuery, selected, onSelect, loading, error }: Props) {
+export function Catalogue({ items, query, onQuery, selected, onSelect, loading, error, landing = false }: Props) {
   const picker = useRef<HTMLDialogElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const current = items.find(({ entry }) => entry.id === selected);
   const currentTitle = current?.timeline?.score.title || current?.entry.id.replace(/[-_]/g, ' ') || 'Choose a score';
   useEffect(() => {
+    if (landing) return;
     const mobile = window.matchMedia('(max-width: 720px)');
     const closeOnDesktop = () => { if (!mobile.matches) picker.current?.close(); };
     mobile.addEventListener('change', closeOnDesktop);
     return () => mobile.removeEventListener('change', closeOnDesktop);
-  }, []);
+  }, [landing]);
   useEffect(() => {
     if (!pickerOpen) return;
     const overflow = document.body.style.overflow;
@@ -48,12 +49,19 @@ export function Catalogue({ items, query, onQuery, selected, onSelect, loading, 
     </button>
     {scoreError ? <p className="score-error" role="alert">{entry.filename}: {scoreError}</p> : null}
   </div>);
+  const search = <div className="search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 5 5" /></svg>
+    <input id="score-search" type="search" aria-label="Search scores" value={query} onChange={e => onQuery(e.target.value)} placeholder="Find a piece…" />
+  </div>;
+  if (landing) return <main className="score-landing" aria-labelledby="landing-title">
+    <div className="score-landing-heading"><h1 id="landing-title">Scores</h1><span>{items.length}</span></div>
+    {search}
+    {notices}
+    <div className="score-list">{choices}</div>
+  </main>;
   return <>
     <aside className="catalogue" aria-label="Score catalogue">
     <div className="catalogue-heading"><h2>Scores</h2><span>{items.length}</span></div>
-    <div className="search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 5 5" /></svg>
-      <input id="score-search" type="search" aria-label="Search scores" value={query} onChange={e => onQuery(e.target.value)} placeholder="Find a piece…" />
-    </div>
+    {search}
     {notices}
     <div className="score-list">{choices}</div>
     </aside>

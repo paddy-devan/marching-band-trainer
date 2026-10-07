@@ -1,16 +1,19 @@
 import { expect, test } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { readdirSync } from 'node:fs';
+
+const scoreCount = readdirSync('scores').filter(file => file.endsWith('.mscz')).length;
 
 test('desktop practice controls change real playback and keep following independent of listening', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.setViewportSize({ width: 1440, height: 1050 });
-  await page.goto('./');
-  await expect(page).toHaveTitle('Marching Band Trainer');
+  await page.goto('./#16obr');
+  await expect(page).toHaveTitle('SLSCC Band');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('16 Bar Off Beat Routine (16 OBR)');
-  await expect(page.locator('.score-choice')).toHaveCount(3);
+  await expect(page.locator('.catalogue .score-choice')).toHaveCount(scoreCount);
   await expect(page.locator('.speed-heading output')).toHaveText('♩ = 116100%');
   await expect(page.locator('.transport-controls .part-controls')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Mute Side Drum' })).toHaveText('');
@@ -39,7 +42,7 @@ test('desktop practice controls change real playback and keep following independ
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Colonel Bogey');
   await expect(page.getByText('Kenneth J. Alford', { exact: true })).toBeVisible();
   await expect(page.locator('.key-signature, .column-label')).toHaveCount(0);
-  await expect(page.locator('.score-list')).not.toContainText(/\d+ bars|\d+ parts/);
+  await expect(page.locator('.catalogue .score-list')).not.toContainText(/\d+ bars|\d+ parts/);
   await expect(page.locator('.piece-meta')).toHaveCount(0);
   await expect(page.locator('.bar-notes-row.current')).toHaveAttribute('aria-label', 'Current bar 1');
   await expect(page.locator('.bar-notes-row.queued')).toHaveAttribute('aria-label', 'Next bar 2');
@@ -100,6 +103,8 @@ test('phone and tablet catalogue, instrument and primary controls fit and respon
   page.on('pageerror', e => errors.push(e.message));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Scores');
+  await expect(page.locator('.practice')).toHaveCount(0);
   await page.getByRole('searchbox', { name: 'Search scores' }).fill('colonel');
   await expect(page.locator('.score-choice')).toHaveCount(1);
   await page.getByRole('button', { name: /Colonel Bogey/ }).click();
@@ -142,7 +147,7 @@ test('Web Audio produces a signal, immediately mutes it, and keeps the visual tr
     };
   });
   const rms = () => page.evaluate(() => (window as unknown as { audioRms?: () => number }).audioRms?.() || 0);
-  await page.goto('./');
+  await page.goto('./#16obr');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('16 Bar Off Beat Routine (16 OBR)');
   await page.getByRole('button', { name: 'Solo Side Drum' }).click();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
@@ -158,8 +163,10 @@ test('Web Audio produces a signal, immediately mutes it, and keeps the visual tr
 
 test('one malformed archive does not prevent the other scores from loading', async ({ page }) => {
   await page.route('**/generated/scores/*16obr.mscz', route => route.fulfill({ body: 'invalid archive' }));
-  await page.goto('./');
-  await expect(page.getByRole('alert')).toContainText('Cannot open this MuseScore archive');
+  await page.goto('./#16obr');
+  await expect(page.locator('.empty-state').getByRole('alert')).toContainText('Cannot open this MuseScore archive');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Cannot load score');
+  await page.getByRole('button', { name: /Colonel Bogey/ }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Colonel Bogey');
   await expect(page.getByRole('button', { name: /Holyrood/i })).toBeEnabled();
 });

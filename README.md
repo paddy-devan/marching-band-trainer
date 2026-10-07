@@ -87,6 +87,8 @@ The local Wrangler OAuth sign-in is separate from the Workers Builds token. Do n
 
 ## Practice controls
 
+Link directly to a score with its filename ID as a URL fragment, for example `https://band.southliverpoolscc.org/#colonel-bogey`. Selecting a score updates the fragment, and browser Back/Forward restores previous selections. Opening the app without a fragment shows a neutral, searchable score list; no score is selected. Returning to the bare URL, including with browser Back, shows that list again. Missing or unreadable linked scores show an error and let you choose another score. Keep score filenames stable so shared links continue to work.
+
 - Play/pause, restart, seek and change speed from 25–150%. The tempo control shows both the current crotchet BPM and the speed percentage. Speed affects timing, not pitch.
 - Mute individual parts or solo one or more. Mute takes precedence over solo; multiple soloed parts play together. Gain nodes apply changes immediately to scheduled and current sounds.
 - Use the eye icon to select the visualised part independently of the audio mix. The speaker icon mutes a part; the headphones icon solos it. All part controls are in the playback panel. Muted parts can still be visualised.
