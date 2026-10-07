@@ -49,6 +49,7 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .lyre-frame { fill: none; stroke: #91a2ad; stroke-width: 6; stroke-linecap: round; }.lyre-rails { stroke: #cbd3d9; stroke-width: 9; }
 .lyre-bar { fill: #e7ecef; stroke: #a9bac5; stroke-width: 1; transition: fill .025s; }.lyre-bar.lit { fill: var(--cyan); stroke: var(--cyan-dark); }.bar-pin { fill: #9badb9; }.bar-letter { font-size: 11px; fill: var(--ink); }
 .mallet line { stroke: #83949e; stroke-width: 5; stroke-linecap: round; }.mallet circle { fill: var(--cyan); stroke: var(--cyan-dark); stroke-width: 2; }
+.mallet.moving { transition: transform .025s linear; }
 .drum-shell { fill: #d9e2e7; stroke: #8b9da8; stroke-width: 3; }.drum-head { fill: #f5f7f8; stroke: #8b9da8; stroke-width: 4; }.drum-rim { stroke: #8b9da8; stroke-width: 5; }.drum-inner { fill: none; stroke: #e0e5e9; stroke-width: 2; }
 .strike { fill: #e5ebee; stroke: #d2dce2; stroke-width: 1; }.strike.lit { fill: var(--cyan); stroke: var(--cyan-dark); }.strike.neutral { fill: var(--cyan); stroke: var(--cyan-dark); }
 .stick line { stroke: #8b9ba5; stroke-width: 9; stroke-linecap: round; }.left-stick { transform: rotate(-14deg); }.right-stick { transform: rotate(14deg); }.left-stick.down { transform: rotate(10deg); }.right-stick.down { transform: rotate(-10deg); }
@@ -100,4 +101,4 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
   .score-error { width: 210px; }
 }
 @media (max-width: 360px) { .practice, .catalogue { padding-left: 14px; padding-right: 14px; }.instrument-stage { min-height: 235px; }.part-row > strong { font-size: 12px; }.part-actions { gap: 2px; } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; }.stick { transform: none !important; }.mallet { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; }.stick { transform: none !important; }.mallet { transform: var(--rest-pose) !important; } }

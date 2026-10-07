@@ -1,16 +1,18 @@
-import { memo } from 'react';
+import { memo, useMemo, type CSSProperties } from 'react';
 import type { Movement, Part } from '../score/model';
 import { pitchLabel } from '../score/labels';
+import { malletPose, type MalletTarget } from './mallet';
 
 export function movementLabel(m: Movement, part: Part) {
   if (!m.percussion) return pitchLabel(m.pitch + part.register.transpose, m.tpc, 'sharps');
   if (part.renderer === 'snare') return m.roll ? `Roll ${m.hand || '—'}` : m.hand || '—';
   return 'Strike';
 }
-type Props = { part: Part; active: Movement[]; position: number };
+type Props = { part: Part; active: Movement[]; position: number; movements?: Movement[]; speed?: number; playing?: boolean };
 
-export const InstrumentView = memo(function InstrumentView({ part, active, position }: Props) {
-  if (part.renderer === 'lyre') return <Lyre part={part} active={active} />;
+export const InstrumentView = memo(function InstrumentView(props: Props) {
+  const { part, active, position } = props;
+  if (part.renderer === 'lyre') return <Lyre {...props} />;
   if (part.renderer === 'snare') return <Snare active={active} position={position} />;
   return <svg viewBox="0 0 480 360" role="img" aria-label={`${part.name}: ${active.length ? 'strike' : 'rest'}`} className="instrument-svg pulse">
     <circle cx="240" cy="175" r="120" className="drum-shell" />
@@ -37,10 +39,25 @@ export function lyreBars(part: Part) {
   }
   return bars;
 }
-function Lyre({ part, active }: Omit<Props, 'position'>) {
-  const bars = lyreBars(part);
+function Lyre({ part, active, position, movements = active, speed = 1, playing = false }: Props) {
+  const bars = useMemo(() => lyreBars(part), [part]);
+  const targets = useMemo(() => {
+    const result: MalletTarget[] = [];
+    for (const movement of movements) {
+      if (movement.percussion) continue;
+      const bar = bars.find(b => b.pitch === movement.pitch + part.register.transpose);
+      if (!bar) continue;
+      const target = { time: movement.time, pitch: bar.pitch, x: bar.x + 40, y: bar.y + 7 };
+      const previous = result.at(-1);
+      // A single beater cues the lowest pitch of a simultaneous chord.
+      if (previous && Math.abs(previous.time - target.time) < 1e-8) {
+        if (target.pitch < previous.pitch) result[result.length - 1] = target;
+      } else result.push(target);
+    }
+    return result;
+  }, [movements, bars, part]);
+  const pose = malletPose(targets, position, speed, playing);
   const pitches = new Set(active.map(m => m.pitch + part.register.transpose));
-  const hit = bars.find(b => pitches.has(b.pitch));
   const outside = [...pitches].filter(p => p < part.register.min || p > part.register.max);
   return <div className="lyre-view">
     <svg viewBox="0 0 480 540" role="img" aria-label={`Bell lyre, ${pitchLabel(part.register.min)} to ${pitchLabel(part.register.max)}${outside.length ? ', note out of range' : ''}`} className="instrument-svg lyre">
@@ -51,7 +68,9 @@ function Lyre({ part, active }: Omit<Props, 'position'>) {
         <circle cx={b.x + 9} cy={b.y + 9.5} r="2" className="bar-pin" />
         <text x={b.x + b.width - 9} y={b.y + 13} textAnchor="end" className="bar-letter">{pitchLabel(b.pitch, undefined, 'sharps')}</text>
       </g>)}
-      {hit ? <g className="mallet"><line x1={hit.x + 40} y1={hit.y + 7} x2={hit.x + 2} y2={hit.y + 66} /><circle cx={hit.x + 40} cy={hit.y + 7} r="8" /></g> : null}
+      <g className={`mallet ${playing ? 'moving' : ''}`} style={{ transform: `translate(${pose.x}px, ${pose.y}px)`, '--rest-pose': `translate(${pose.previewX}px, ${pose.previewY}px)` } as CSSProperties}>
+        <line x1="0" y1="0" x2="-38" y2="59" /><circle cx="0" cy="0" r="8" />
+      </g>
     </svg>
     {outside.length ? <p className="range-warning" role="status">Out of range: {outside.map(p => pitchLabel(p)).join(', ')}</p> : null}
   </div>;

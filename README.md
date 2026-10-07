@@ -92,7 +92,8 @@ The local Wrangler OAuth sign-in is separate from the Workers Builds token. Do n
 - Use the eye icon to select the visualised part independently of the audio mix. The speaker icon mutes a part; the headphones icon solos it. All part controls are in the playback panel. Muted parts can still be visualised.
 - Read the entire current bar of pitches or sticking, with the next played bar queued below. Simultaneous pitches display together, and rests remain visible. Highlights follow the instrument, briefly releasing between repeated strikes while tied notes remain continuous across bars. Compound meters such as 12/8 count dotted-crotchet beats; the tempo label still uses crotchet BPM from the score.
 - Note labels always use sharps to match the bell lyre. Octaves remain distinct.
-- Controls use native keyboard interactions and large touch targets. Reduced-motion preferences keep highlights and note labels while disabling stick movement and the mallet overlay.
+- The lyre beater stays visible, hovers above the first note before playback, then rebounds and moves toward the next played note. Its motion follows playback speed and pauses with the transport.
+- Controls use native keyboard interactions and large touch targets. Reduced-motion preferences keep highlights, note labels and a stationary beater cue above the next note while disabling stick movement and animated beater travel.
 
 Audio starts after pressing Play. The transport uses the Web Audio clock with a short lookahead, and visual state derives from that clock. Pause, seek, speed changes, restart and score changes cancel scheduled sources. A suspended audio context pauses the transport and prompts the student to press Play again. Skipped scheduling windows after background-tab delays do not replay old attacks in a burst.
 

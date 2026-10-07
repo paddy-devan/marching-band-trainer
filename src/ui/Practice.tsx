@@ -32,7 +32,7 @@ export function Practice({ timeline }: { timeline: Timeline }) {
     <div className="practice-grid">
       <section className="visual-panel" aria-labelledby="visual-title">
         <div className="visual-heading"><h2 id="visual-title">{part.name}</h2></div>
-        <div className="instrument-stage"><InstrumentView part={part} active={active} position={state.position} /></div>
+        <div className="instrument-stage"><InstrumentView part={part} active={active} position={state.position} movements={partMovements} speed={state.speed} playing={state.playing} /></div>
         <BarNotes score={score} part={part} movements={partMovements} measure={measure} position={state.position} active={active} />
       </section>
       <div className="control-column">
