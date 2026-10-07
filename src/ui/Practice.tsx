@@ -26,9 +26,7 @@ export function Practice({ timeline }: { timeline: Timeline }) {
   const beat = Math.max(1, Math.floor((Math.min(beats, value(measure.start) + value(measure.duration) - 0.001) - value(measure.start)) / beatUnit) + 1);
   const tempo = score.tempos.filter(t => value(t.position) <= beats).at(-1) || score.tempos[0];
   return <main className="practice">
-    <header className="piece-heading"><h1>{score.title}</h1>{score.composer ? <p>{score.composer}</p> : null}
-      <div className="piece-meta"><span>{measure.signature.numerator}/{measure.signature.denominator} time</span></div>
-    </header>
+    <header className="piece-heading"><h1>{score.title}</h1>{score.composer ? <p>{score.composer}</p> : null}</header>
     <div className="practice-grid">
       <section className="visual-panel" aria-labelledby="visual-title">
         <div className="visual-heading"><h2 id="visual-title">{part.name}</h2></div>

@@ -40,7 +40,7 @@ test('desktop practice controls change real playback and keep following independ
   await expect(page.getByText('Kenneth J. Alford', { exact: true })).toBeVisible();
   await expect(page.locator('.key-signature, .column-label')).toHaveCount(0);
   await expect(page.locator('.score-list')).not.toContainText(/\d+ bars|\d+ parts/);
-  await expect(page.locator('.piece-meta')).not.toContainText('bars');
+  await expect(page.locator('.piece-meta')).toHaveCount(0);
   await expect(page.locator('.bar-notes-row.current')).toHaveAttribute('aria-label', 'Current bar 1');
   await expect(page.locator('.bar-notes-row.queued')).toHaveAttribute('aria-label', 'Next bar 2');
   await expect(page.locator('.lyre-bar')).toHaveCount(25);
