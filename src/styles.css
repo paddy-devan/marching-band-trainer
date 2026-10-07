@@ -35,6 +35,23 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .score-choice.selected { background: #fff; border-color: var(--cyan); box-shadow: inset 3px 0 var(--cyan); }
 .score-choice strong { display: block; font-size: 14px; font-weight: 600; }.score-choice small { margin-top: 5px; }
 .score-icon { color: var(--cyan-dark); font-size: 20px; line-height: 1.2; }
+.score-check, .mobile-score-switcher { display: none; }
+.score-picker { position: fixed; inset: auto 0 0; margin: 0 auto; width: min(100%, 560px); max-width: 100%; max-height: min(80dvh, 720px); padding: 0; border: 0; border-radius: 18px 18px 0 0; background: #fff; color: var(--ink); box-shadow: 0 -8px 40px #24364226; }
+.score-picker[open] { display: flex; flex-direction: column; }
+.score-picker::backdrop { background: #172e3180; }
+.score-picker-top { padding: 12px 20px 16px; flex-shrink: 0; border-bottom: 1px solid var(--line); }
+.score-picker .search-field input { font-size: 16px; }
+.score-picker-handle { width: 36px; height: 4px; border-radius: 2px; background: #cbd3d9; margin: 0 auto 8px; }
+.score-picker-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.score-picker-heading h2 span { margin-left: 8px; font-size: 13px; font-weight: 400; color: var(--muted); }
+.score-picker-close { padding: 0; width: 44px; border: 0; background: transparent; font-size: 28px; font-weight: 400; color: var(--muted); }
+.score-picker-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 20px max(20px, env(safe-area-inset-bottom)); }
+.score-picker .score-list { display: grid; margin-top: 0; gap: 4px; }
+.score-picker .score-choice { min-height: 52px; padding: 12px; align-items: center; }
+.score-picker .score-choice > span:nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
+.score-picker .score-choice.selected { background: var(--selected); border-color: transparent; box-shadow: none; }
+.score-picker .score-check { display: inline-flex; margin-left: auto; padding-left: 8px; color: var(--cyan-dark); flex-shrink: 0; }
+.score-empty { padding: 16px 0; font-size: 14px; color: var(--muted); }
 .practice { padding: 32px clamp(22px, 3vw, 48px); min-width: 0; max-width: 1350px; }
 .piece-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .piece-heading h1 { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
@@ -92,12 +109,15 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
 }
 @media (max-width: 720px) {
   .app-header { height: 70px; padding: 0 20px; }.brand { font-size: 17px; gap: 11px; }.app-layout { display: block; }
-  .catalogue { border-right: 0; border-bottom: 1px solid var(--line); padding: 20px; }.catalogue-heading { margin-bottom: 12px; }
-  .score-list { display: flex; overflow-x: auto; margin-top: 10px; gap: 4px; padding-bottom: 6px; }.score-list > div { flex: 0 0 218px; }.score-choice { height: 100%; }
+  .catalogue { display: none; }
+  .mobile-score-switcher { display: flex; align-items: center; gap: 16px; justify-content: space-between; padding: 16px 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .mobile-score-switcher > div { min-width: 0; }
+  .mobile-score-switcher small { margin-bottom: 5px; }
+  .mobile-score-switcher strong { display: block; font-size: 14px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+  .change-score { flex-shrink: 0; font-size: 13px; padding: 9px 12px; color: var(--cyan-dark); border-color: #b7dce5; }
   .practice { padding: 24px 20px; }.piece-heading p { font-size: 14px; }.practice-grid { margin-top: 22px; }.transport-controls { padding: 20px 16px 8px; }
   .time-readout { margin-bottom: 20px; }.visual-panel { padding: 17px; }.visual-heading h2 { font-size: 17px; }.lyre { max-height: 360px; }
   .note-line { gap: 6px; }.note-cue { font-size: 18px; padding: 8px; }.queued .note-cue { font-size: 16px; }
-  .score-error { width: 210px; }
 }
 @media (max-width: 360px) { .practice, .catalogue { padding-left: 14px; padding-right: 14px; }.instrument-stage { min-height: 235px; }.part-row > strong { font-size: 12px; }.part-actions { gap: 2px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; }.stick { transform: none !important; }.mallet { transform: var(--rest-pose) !important; } }
