@@ -24,20 +24,20 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .brand-mark { display: block; width: 36px; height: 40px; flex-shrink: 0; background: #fff; -webkit-mask: url('./assets/band-wave.svg') center / contain no-repeat; mask: url('./assets/band-wave.svg') center / contain no-repeat; mask-mode: alpha; }
 .app-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: calc(100vh - 80px); max-width: 1600px; margin: auto; }
 .catalogue { padding: 30px 18px; border-right: 1px solid var(--line); background: var(--surface); min-width: 0; }
-.catalogue-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+.catalogue-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .catalogue-heading h2 { font-size: 17px; }.catalogue-heading > span { color: var(--muted); font-size: 13px; }
-.search-label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 7px; }
 .search-field { display: flex; border: 1px solid var(--line); border-radius: 6px; background: #fff; align-items: center; padding-left: 11px; }
 .search-field svg { width: 18px; height: 18px; stroke: var(--muted); stroke-width: 1.7; fill: none; flex-shrink: 0; }
 .search-field input { width: 100%; min-width: 0; border: 0; background: transparent; padding: 12px 9px; font-size: 14px; }
-.score-list { display: grid; gap: 8px; margin-top: 22px; }
-.score-choice { width: 100%; display: flex; text-align: left; gap: 10px; align-items: flex-start; background: transparent; border-color: transparent; padding: 14px 10px; line-height: 1.45; }
+.search-field input:focus-visible { outline: none; }
+.score-list { display: grid; gap: 4px; margin-top: 14px; }
+.score-choice { width: 100%; display: flex; text-align: left; gap: 8px; align-items: flex-start; background: transparent; border-color: transparent; padding: 8px 10px; line-height: 1.4; }
 .score-choice.selected { background: #fff; border-color: var(--cyan); box-shadow: inset 3px 0 var(--cyan); }
 .score-choice strong { display: block; font-size: 14px; font-weight: 600; }.score-choice small { margin-top: 5px; }
-.score-icon { color: var(--cyan-dark); font-size: 23px; line-height: 1.2; }.selected-dot { border-radius: 50%; background: var(--cyan); width: 6px; height: 6px; margin: 8px 0 0 auto; flex-shrink: 0; }
+.score-icon { color: var(--cyan-dark); font-size: 20px; line-height: 1.2; }
 .practice { padding: 32px clamp(22px, 3vw, 48px); min-width: 0; max-width: 1350px; }
 .piece-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.piece-heading h1 { min-width: 0; overflow-wrap: anywhere; }
+.piece-heading h1 { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
 .piece-heading > p { color: var(--muted); font-size: 15px; text-align: right; flex-shrink: 0; max-width: 45%; }
 .practice-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 24px; margin-top: 26px; align-items: start; }
 .visual-panel { border: 1px solid var(--line); border-radius: 8px; padding: 22px; overflow: hidden; min-width: 0; }
@@ -92,8 +92,8 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
 }
 @media (max-width: 720px) {
   .app-header { height: 70px; padding: 0 20px; }.brand { font-size: 17px; gap: 11px; }.app-layout { display: block; }
-  .catalogue { border-right: 0; border-bottom: 1px solid var(--line); padding: 20px; }.catalogue-heading { margin-bottom: 12px; }.search-label { display: none; }
-  .score-list { display: flex; overflow-x: auto; margin-top: 14px; gap: 8px; padding-bottom: 6px; }.score-list > div { flex: 0 0 218px; }.score-choice { height: 100%; }
+  .catalogue { border-right: 0; border-bottom: 1px solid var(--line); padding: 20px; }.catalogue-heading { margin-bottom: 12px; }
+  .score-list { display: flex; overflow-x: auto; margin-top: 10px; gap: 4px; padding-bottom: 6px; }.score-list > div { flex: 0 0 218px; }.score-choice { height: 100%; }
   .practice { padding: 24px 20px; }.piece-heading p { font-size: 14px; }.practice-grid { margin-top: 22px; }.transport-controls { padding: 20px 16px 8px; }
   .time-readout { margin-bottom: 20px; }.visual-panel { padding: 17px; }.visual-heading h2 { font-size: 17px; }.lyre { max-height: 360px; }
   .note-line { gap: 6px; }.note-cue { font-size: 18px; padding: 8px; }.queued .note-cue { font-size: 16px; }

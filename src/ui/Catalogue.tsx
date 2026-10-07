@@ -8,10 +8,9 @@ type Props = {
 export function Catalogue({ items, query, onQuery, selected, onSelect, loading, error }: Props) {
   const filtered = items.filter(({ entry, timeline }) => `${timeline?.score.title || entry.id} ${timeline?.score.composer || ''}`.toLowerCase().includes(query.toLowerCase()));
   return <aside className="catalogue" aria-label="Score catalogue">
-    <div className="catalogue-heading"><h2>Your scores</h2><span>{items.length}</span></div>
-    <label className="search-label" htmlFor="score-search">Search scores</label>
+    <div className="catalogue-heading"><h2>Scores</h2><span>{items.length}</span></div>
     <div className="search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6" /><path d="m15 15 5 5" /></svg>
-      <input id="score-search" type="search" value={query} onChange={e => onQuery(e.target.value)} placeholder="Find a piece…" />
+      <input id="score-search" type="search" aria-label="Search scores" value={query} onChange={e => onQuery(e.target.value)} placeholder="Find a piece…" />
     </div>
     {error ? <p className="error" role="alert">{error}</p> : null}
     {loading && !items.length ? <p role="status">Loading your scores…</p> : null}
@@ -23,7 +22,6 @@ export function Catalogue({ items, query, onQuery, selected, onSelect, loading, 
           <span className="score-icon" aria-hidden="true">♫</span>
           <span><strong>{timeline?.score.title || entry.id.replace(/[-_]/g, ' ')}</strong>
             {!timeline ? <small>{scoreError ? 'Could not load' : 'Reading score…'}</small> : null}</span>
-          {selected === entry.id ? <span className="selected-dot" aria-hidden="true" /> : null}
         </button>
         {scoreError ? <p className="score-error" role="alert">{entry.filename}: {scoreError}</p> : null}
       </div>)}
