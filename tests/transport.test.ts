@@ -95,6 +95,26 @@ describe('audio-clock transport', () => {
     expect(transport.getSnapshot().position).toBe(0);
     transport.dispose();
   });
+  it('adds a modest ringing tail to bell lyre notes and still stops them on pause', async () => {
+    const score = parseScore(synthetic([measure(time() + tempo(120) + chord())]), 'test');
+    const ring = async (lyre: boolean) => {
+      score.parts[0].renderer = lyre ? 'lyre' : 'pulse';
+      const context = new FakeContext();
+      const transport = new Transport(interpretScore(score), () => context as unknown as AudioContext);
+      await transport.play();
+      return { context, transport };
+    };
+    const ordinary = await ring(false);
+    const lyre = await ring(true);
+    const source = lyre.context.sources[0];
+    expect(source.stop.mock.calls[0][0] - source.start.mock.calls[0][0]).toBeCloseTo(0.67);
+    expect(ordinary.context.sources[0].stop.mock.calls[0][0] - ordinary.context.sources[0].start.mock.calls[0][0]).toBeCloseTo(0.51);
+    expect(source.frequency.calls).toEqual(ordinary.context.sources[0].frequency.calls);
+    expect(lyre.context.gains.at(-1)!.gain.calls).toHaveLength(4);
+    lyre.transport.pause();
+    expect(source.stop.mock.calls.some(args => args.length === 0)).toBe(true);
+    ordinary.transport.dispose(); lyre.transport.dispose();
+  });
   it('handles completion, suspended contexts and cancellation during pending resume', async () => {
     const { context, transport } = setup();
     await transport.play();

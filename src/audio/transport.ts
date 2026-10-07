@@ -158,7 +158,9 @@ export class Transport {
     gain.connect(bus);
     gain.gain.setValueAtTime(0.0001, when);
     gain.gain.linearRampToValueAtTime(contact.velocity * (contact.movement.percussion ? 0.65 : 0.45), when + 0.003);
-    const decay = contact.movement.percussion ? Math.min(length, 0.16) : length;
+    const lyre = part.renderer === 'lyre' && !contact.movement.percussion;
+    const decay = contact.movement.percussion ? Math.min(length, 0.16) : lyre ? Math.min(2.5, length * 1.2 + 0.06) : length;
+    if (lyre) gain.gain.exponentialRampToValueAtTime(contact.velocity * 0.055, when + Math.min(0.3, length * 0.5));
     gain.gain.exponentialRampToValueAtTime(0.0001, when + decay);
     if (!contact.movement.percussion || /bass/i.test(part.name + part.instrument)) {
       const osc = ctx.createOscillator();

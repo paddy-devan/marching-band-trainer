@@ -51,19 +51,16 @@ function Lyre({ part, active }: Omit<Props, 'position'>) {
         <circle cx={b.x + 9} cy={b.y + 9.5} r="2" className="bar-pin" />
         <text x={b.x + b.width - 9} y={b.y + 13} textAnchor="end" className="bar-letter">{pitchLabel(b.pitch, undefined, 'sharps')}</text>
       </g>)}
-      {hit ? <g className="mallet"><line x1={hit.x + 40} y1={hit.y + 7} x2={hit.x + 2} y2={hit.y - 52} /><circle cx={hit.x + 40} cy={hit.y + 7} r="8" /></g> : null}
-      <text x="142" y="531" textAnchor="middle" className="column-label">Accidentals</text>
-      <text x="315" y="531" textAnchor="middle" className="column-label">Naturals</text>
+      {hit ? <g className="mallet"><line x1={hit.x + 40} y1={hit.y + 7} x2={hit.x + 2} y2={hit.y + 66} /><circle cx={hit.x + 40} cy={hit.y + 7} r="8" /></g> : null}
     </svg>
     {outside.length ? <p className="range-warning" role="status">Out of range: {outside.map(p => pitchLabel(p)).join(', ')}</p> : null}
   </div>;
 }
-function Snare({ active, position }: Pick<Props, 'active' | 'position'>) {
+function Snare({ active }: Pick<Props, 'active' | 'position'>) {
   // Sticks only move for known hands. Unknown hands use a central neutral indicator.
   const hands = new Set(active.map(m => m.hand));
-  const recent = active.some(m => position - m.time < Math.min(0.12, m.seconds));
-  const left = hands.has('L') && recent;
-  const right = hands.has('R') && recent;
+  const left = hands.has('L');
+  const right = hands.has('R');
   return <svg viewBox="0 0 480 360" role="img" aria-label={`Side drum: ${active.length ? active.map(m => m.hand || 'unspecified hand').join(', ') : 'rest'}`} className="instrument-svg snare">
     <ellipse cx="240" cy="211" rx="147" ry="94" className="drum-shell" />
     <path d="M93 161 V210 M387 161 V210" className="drum-rim" />
@@ -71,7 +68,7 @@ function Snare({ active, position }: Pick<Props, 'active' | 'position'>) {
     <ellipse cx="240" cy="166" rx="134" ry="77" className="drum-inner" />
     <circle cx="176" cy="173" r={left ? 23 : 13} className={`strike ${left ? 'lit left' : ''}`} />
     <circle cx="304" cy="173" r={right ? 23 : 13} className={`strike ${right ? 'lit right' : ''}`} />
-    {hands.has(undefined) && recent ? <circle cx="240" cy="173" r="19" className="strike lit neutral" /> : null}
+    {hands.has(undefined) ? <circle cx="240" cy="173" r="19" className="strike lit neutral" /> : null}
     <g className={`stick left-stick ${left ? 'down' : ''}`} style={{ transformOrigin: '155px 125px' }}><line x1="70" y1="39" x2="177" y2="144" /></g>
     <g className={`stick right-stick ${right ? 'down' : ''}`} style={{ transformOrigin: '325px 125px' }}><line x1="410" y1="39" x2="303" y2="144" /></g>
     <text x="153" y="320" textAnchor="middle">Left · L</text><text x="327" y="320" textAnchor="middle">Right · R</text>

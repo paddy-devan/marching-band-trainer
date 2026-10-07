@@ -90,8 +90,8 @@ The local Wrangler OAuth sign-in is separate from the Workers Builds token. Do n
 - Play/pause, restart, seek and change speed from 25–150%. The tempo control shows both the current crotchet BPM and the speed percentage. Speed affects timing, not pitch.
 - Mute individual parts or solo one or more. Mute takes precedence over solo; multiple soloed parts play together. Gain nodes apply changes immediately to scheduled and current sounds.
 - Use the eye icon to select the visualised part independently of the audio mix. The speaker icon mutes a part; the headphones icon solos it. All part controls are in the playback panel. Muted parts can still be visualised.
-- Read current/upcoming pitches or sticking, bar and beat. Multiple pitches at the same position display together. Compound meters such as 12/8 count dotted-crotchet beats; the tempo label still uses crotchet BPM from the score.
-- Note labels always use sharps to match the bell lyre. Octaves remain distinct. Key signatures show both possible relative keys unless the score explicitly declares a mode.
+- Read the entire current bar of pitches or sticking, with the next played bar queued below. Simultaneous pitches display together, and rests remain visible. Highlights follow the instrument, briefly releasing between repeated strikes while tied notes remain continuous across bars. Compound meters such as 12/8 count dotted-crotchet beats; the tempo label still uses crotchet BPM from the score.
+- Note labels always use sharps to match the bell lyre. Octaves remain distinct.
 - Controls use native keyboard interactions and large touch targets. Reduced-motion preferences keep highlights and note labels while disabling stick movement and the mallet overlay.
 
 Audio starts after pressing Play. The transport uses the Web Audio clock with a short lookahead, and visual state derives from that clock. Pause, seek, speed changes, restart and score changes cancel scheduled sources. A suspended audio context pauses the transport and prompts the student to press Play again. Skipped scheduling windows after background-tab delays do not replay old attacks in a burst.
@@ -140,7 +140,7 @@ Sticking priority is explicit position-anchored annotation, named drum mapping, 
 
 Supported snare roll marks are `r16` and `r32`. Slash count does not set the hand-change rate. Tied roll segments join before expansion; phase continues across bar lines over a half-open span with no duplicate boundary or extra final attack. Unknown starting hands remain unspecified. The first version approximates roll audio with **two decaying noise contacts per skeleton movement**, generated separately from hand movements. Other tremolos play as single events; parser diagnostics remain available on the timeline model.
 
-Pitched audio uses decaying triangle oscillators. Bass drum uses a decaying low sine, and snare uses high-passed noise. Left and right snare identifiers use the same sound. These are approximate practice sounds, not MuseScore or Muse Sounds reproduction. The configuration's register transpose is separate from tempo/speed, and is never inferred by forcing every score into the instrument range.
+Pitched audio uses decaying triangle oscillators, with a slightly longer ringing tail for the bell lyre. Bass drum uses a decaying low sine, and snare uses high-passed noise. Left and right snare identifiers use the same sound. These are approximate practice sounds, not MuseScore or Muse Sounds reproduction. The configuration's register transpose is separate from tempo/speed, and is never inferred by forcing every score into the instrument range.
 
 ## Supported notation and limitations
 
