@@ -1,6 +1,6 @@
 # Marching Band Trainer
 
-A static practice app that reads original MuseScore archives, plays the parts together or separately, and follows one selected instrument. Built with React, TypeScript, Vite, `fflate` and native Web Audio. No backend, database, authentication, MuseScore process or MIDI exports are needed.
+A static practice app that reads original MuseScore archives, plays the parts together or separately, and follows a selected instrument. Built with React, TypeScript, Vite, `fflate` and native Web Audio. No backend, database, authentication, MuseScore process or MIDI exports are needed.
 
 ## Run locally
 
