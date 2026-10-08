@@ -71,9 +71,14 @@ Manage these settings in **Cloudflare → Workers & Pages → marching-band-trai
 | Deploy command | `npm run deploy` |
 | Build environment variable | `NODE_VERSION=24` |
 | Build environment variable | `VITE_BASE=/` |
-| Non-production branch builds | Disabled |
+| Preview branch builds | Enabled (Previews Base) |
+| Preview command | `npx wrangler preview` |
 
 Cloudflare automatically installs dependencies using the committed `package-lock.json`. `ci:build` runs the parser and transport tests before type checking and building. Failed checks stop deployment. Use Cloudflare's generated Workers Builds token or an existing appropriately scoped deployment token; credentials stay in Cloudflare's build settings, never in frontend assets, source files or chat. See [Workers Builds configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/).
+
+Pushes to non-production branches automatically build and deploy a separate Worker Preview. `wrangler.json` includes the required empty `previews` block; the static assets and compatibility settings remain at the top level. Without that block, `npx wrangler preview` fails after a successful build. The `preview_urls: false` setting controls legacy version URLs and does not disable the separate Worker Previews workflow. See [Worker Preview configuration](https://developers.cloudflare.com/workers/previews/configuration/).
+
+To inspect an automatic branch build, select its preview name in the dropdown next to the Worker's name, then open **Deployments → Build history**. Production build history only shows production builds. For this branch, the stable preview URL is `https://bell-lyre-game-marching-band-trainer.p-devaney96.workers.dev/` and becomes usable after a successful preview deployment. Production and Previews Base have separate build variables; the current preview environment uses the build image's default Node version, while production explicitly sets `NODE_VERSION=24` and `VITE_BASE=/`.
 
 Local checks and deployments:
 
