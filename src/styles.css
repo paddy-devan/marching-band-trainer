@@ -22,7 +22,7 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .brand:focus-visible { outline-color: #fff; }
 .brand strong { font-weight: 800; }
 .brand-mark { display: block; width: 36px; height: 40px; flex-shrink: 0; background: #fff; -webkit-mask: url('./assets/band-wave.svg') center / contain no-repeat; mask: url('./assets/band-wave.svg') center / contain no-repeat; mask-mode: alpha; }
-.app-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: calc(100vh - 80px); max-width: 1600px; margin: auto; }
+.app-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: calc(100vh - 80px); }
 .score-landing-layout { display: block; }
 .score-landing { width: 100%; max-width: 680px; margin: 0 auto; padding: 40px 24px; }
 .score-landing-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
