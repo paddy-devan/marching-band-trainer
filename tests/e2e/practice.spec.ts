@@ -40,7 +40,7 @@ test('desktop practice controls change real playback and keep following independ
   await expect(seek).toHaveValue('0');
   await page.getByRole('button', { name: /Colonel Bogey/ }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Colonel Bogey');
-  await expect(page.getByText('Kenneth J. Alford', { exact: true })).toBeVisible();
+  await expect(page.locator('.piece-heading').getByText('Kenneth J. Alford', { exact: true })).toBeVisible();
   await expect(page.locator('.key-signature, .column-label')).toHaveCount(0);
   await expect(page.locator('.catalogue .score-list')).not.toContainText(/\d+ bars|\d+ parts/);
   await expect(page.locator('.piece-meta')).toHaveCount(0);
@@ -109,8 +109,30 @@ test('phone and tablet catalogue, instrument and primary controls fit and respon
   await expect(page.locator('.score-choice')).toHaveCount(1);
   await page.getByRole('button', { name: /Colonel Bogey/ }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Colonel Bogey');
+  await expect(page.locator('.piece-heading')).toBeHidden();
+  await expect(page.locator('.mobile-score-switcher')).not.toContainText('Current score');
+  await expect(page.locator('.mobile-score-switcher p')).toHaveText('Kenneth J. Alford');
+  const playback = page.locator('.playback-controls');
+  const play = page.getByRole('button', { name: 'Play', exact: true });
+  const visual = page.locator('.visual-panel');
+  expect((await playback.boundingBox())!.y).toBeLessThan((await visual.boundingBox())!.y);
+  expect((await play.boundingBox())!.y + (await play.boundingBox())!.height).toBeLessThan(844);
+  await expect(page.locator('.note-octave').first()).toBeVisible();
+  const octaveStyle = await page.locator('.note-octave').first().evaluate(el => ({
+    size: parseFloat(getComputedStyle(el).fontSize),
+    letterSize: parseFloat(getComputedStyle(el.parentElement!).fontSize),
+    color: getComputedStyle(el).color,
+    letterColor: getComputedStyle(el.parentElement!).color,
+  }));
+  expect(octaveStyle.size).toBeLessThan(octaveStyle.letterSize);
+  expect(octaveStyle.color).not.toBe(octaveStyle.letterColor);
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await visual.scrollIntoViewIfNeeded();
+  const pause = page.getByRole('button', { name: 'Pause', exact: true });
+  const pauseBox = (await pause.boundingBox())!;
+  expect(pauseBox.y).toBeGreaterThanOrEqual(0);
+  expect(pauseBox.y + pauseBox.height).toBeLessThan(844);
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await page.getByRole('button', { name: 'Visualise Side Drum' }).click();
   await expect(page.locator('.snare')).toBeVisible();

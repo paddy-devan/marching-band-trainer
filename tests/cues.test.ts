@@ -40,8 +40,11 @@ describe('bar cues and shared strike highlights', () => {
     const html = renderToStaticMarkup(createElement(BarNotes, props));
     expect(html).toContain('Current bar 1');
     expect(html).toContain('Next bar 2');
-    expect(html.match(/<span>C4<\/span>/g)).toHaveLength(3);
-    expect(html).toContain('<span>D4</span>');
+    const notes = document.createElement('div');
+    notes.innerHTML = html;
+    expect([...notes.querySelectorAll('.current .note-cue')].map(note => note.textContent)).toEqual(['C4', 'C4', 'C4']);
+    expect(notes.querySelector('.queued .note-cue')?.textContent).toBe('D4');
+    expect([...notes.querySelectorAll('.note-octave')].map(octave => octave.textContent)).toEqual(['4', '4', '4', '4']);
     expect(html.match(/aria-current="true"/g)).toHaveLength(1);
     const gap = renderToStaticMarkup(createElement(BarNotes, { ...props, position: 0.48, active: [] }));
     expect(gap).not.toContain('aria-current="true"');

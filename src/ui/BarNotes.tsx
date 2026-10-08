@@ -49,7 +49,10 @@ export function BarNotes({ score, part, movements, measure, position, active }: 
         const played = !queued && position >= cue.end;
         const labels = [...new Set(cue.movements.map(m => movementLabel(m, part)))];
         return <li key={`${cue.start}:${index}`} className={`note-cue ${sounding || resting ? 'lit' : ''} ${played ? 'played' : ''} ${!cue.movements.length ? 'rest' : ''}`} aria-current={sounding || resting ? 'true' : undefined}>
-          {labels.length ? labels.map(label => <span key={label}>{label}</span>) : <span>Rest</span>}
+          {labels.length ? labels.map(label => {
+            const pitch = label.match(/^([A-G][♯♭]?)(-?\d+)$/);
+            return <span key={label}>{pitch ? <>{pitch[1]}<sub className="note-octave">{pitch[2]}</sub></> : label}</span>;
+          }) : <span>Rest</span>}
         </li>;
       })}
     </ol>

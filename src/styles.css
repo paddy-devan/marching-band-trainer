@@ -86,6 +86,8 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .bar-notes-label { color: var(--muted); font-size: 12px; margin-bottom: 10px; font-variant-numeric: tabular-nums; }
 .note-line { display: flex; flex-wrap: wrap; align-items: stretch; gap: 7px; list-style: none; margin: 0; padding: 0; }
 .note-cue { display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 44px; padding: 9px 10px; border-radius: 5px; background: var(--surface); color: var(--ink); font-family: Manrope, system-ui, sans-serif; font-size: 20px; font-weight: 750; line-height: 1.4; transition: background-color .025s, color .025s; }
+.note-octave { font-size: .6em; font-weight: 500; line-height: 0; vertical-align: -.2em; color: var(--muted); margin-left: 1px; }
+.note-cue.lit .note-octave { color: #3f5662; }
 .note-cue.played { color: var(--muted); background: #f8f9fa; }
 .queued .note-cue { font-size: 17px; color: var(--muted); background: #f8f9fa; }
 .note-cue.rest { font-size: 13px; font-weight: 500; }
@@ -115,7 +117,12 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
 @media (max-width: 1150px) {
   .app-layout { grid-template-columns: 220px minmax(0, 1fr); }.catalogue { padding: 28px 14px; }.practice { padding: 28px 24px; }
   .practice-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }.instrument-stage { min-height: 270px; }.lyre { max-height: 360px; }.snare { max-height: 270px; }
-  .transport-controls { max-width: none; }.transport-top { margin-bottom: 12px; }.part-row > strong { font-size: 14px; }
+  .control-column, .transport-controls { display: contents; }
+  .playback-controls { grid-row: 1; position: sticky; top: 0; z-index: 10; padding: 12px 16px 10px; background: #fff; border: 1px solid var(--line); border-top: 4px solid var(--cyan); border-radius: 8px; box-shadow: 0 3px 8px #2436420d; }
+  .practice-grid > .visual-panel { grid-row: 2; }
+  .practice-settings { grid-row: 3; min-width: 0; padding: 20px 16px 8px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+  .playback-controls .time-readout { margin-bottom: 0; }
+  .transport-top { margin-bottom: 6px; }.part-row > strong { font-size: 14px; }
 }
 @media (max-width: 720px) {
   .app-header { height: 70px; padding: 0 20px; }.brand { font-size: 17px; gap: 11px; }.app-layout { display: block; }
@@ -123,10 +130,10 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
   .catalogue { display: none; }
   .mobile-score-switcher { display: flex; align-items: center; gap: 16px; justify-content: space-between; padding: 16px 20px; background: var(--surface); border-bottom: 1px solid var(--line); }
   .mobile-score-switcher > div { min-width: 0; }
-  .mobile-score-switcher small { margin-bottom: 5px; }
-  .mobile-score-switcher strong { display: block; font-size: 14px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+  .mobile-score-switcher h1 { font-size: 18px; font-weight: 600; line-height: 1.4; letter-spacing: -.3px; overflow-wrap: anywhere; }
+  .mobile-score-switcher p { margin-top: 4px; font-size: 13px; color: var(--muted); line-height: 1.4; overflow-wrap: anywhere; }
   .change-score { flex-shrink: 0; font-size: 13px; padding: 9px 12px; color: var(--cyan-dark); border-color: #b7dce5; }
-  .practice { padding: 24px 20px; }.piece-heading p { font-size: 14px; }.practice-grid { margin-top: 22px; }.transport-controls { padding: 20px 16px 8px; }
+  .practice { padding: 16px 20px 24px; }.piece-heading { display: none; }.practice-grid { margin-top: 0; }
   .time-readout { margin-bottom: 20px; }.visual-panel { padding: 17px; }.visual-heading h2 { font-size: 17px; }.lyre { max-height: 360px; }
   .note-line { gap: 6px; }.note-cue { font-size: 18px; padding: 8px; }.queued .note-cue { font-size: 16px; }
 }

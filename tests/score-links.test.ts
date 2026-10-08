@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 const render = () => act(async () => root.render(createElement(App)));
-const title = () => container.querySelector('h1')?.textContent;
+const title = () => container.querySelector('main h1')?.textContent;
 const choose = (name: string) => {
   const button = [...container.querySelectorAll<HTMLButtonElement>('.catalogue .score-choice, .score-landing .score-choice')].find(button => button.textContent?.includes(name))!;
   act(() => button.click());

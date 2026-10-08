@@ -54,7 +54,9 @@ it('opens the picker, switches scores, closes it and restores page scrolling', (
   const choice = [...dialog.querySelectorAll<HTMLButtonElement>('.score-choice')].find(button => button.textContent?.includes('Colonel Bogey'))!;
   act(() => choice.click());
   expect(dialog.open).toBe(false);
-  expect(container.querySelector('.mobile-score-switcher strong')?.textContent).toBe('Colonel Bogey');
+  expect(container.querySelector('.mobile-score-switcher h1')?.textContent).toBe('Colonel Bogey');
+  expect(container.querySelector('.mobile-score-switcher p')?.textContent).toBe('Kenneth J. Alford');
+  expect(container.querySelector('.mobile-score-switcher')?.textContent).not.toContain('Current score');
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
   expect(document.body.style.overflow).toBe('');
 });

@@ -11,6 +11,7 @@ export function Catalogue({ items, query, onQuery, selected, onSelect, loading, 
   const [pickerOpen, setPickerOpen] = useState(false);
   const current = items.find(({ entry }) => entry.id === selected);
   const currentTitle = current?.timeline?.score.title || current?.entry.id.replace(/[-_]/g, ' ') || 'Choose a score';
+  const currentComposer = current?.timeline?.score.composer;
   useEffect(() => {
     if (landing) return;
     const mobile = window.matchMedia('(max-width: 720px)');
@@ -66,7 +67,7 @@ export function Catalogue({ items, query, onQuery, selected, onSelect, loading, 
     <div className="score-list">{choices}</div>
     </aside>
     <div className="mobile-score-switcher">
-      <div><small>Current score</small><strong>{currentTitle}</strong></div>
+      <div><h1>{currentTitle}</h1>{currentComposer ? <p>{currentComposer}</p> : null}</div>
       <button type="button" className="change-score" onClick={openPicker} aria-haspopup="dialog" aria-expanded={pickerOpen} aria-controls="score-picker">Change score</button>
     </div>
     <dialog id="score-picker" className="score-picker" ref={picker} aria-labelledby="score-picker-title" onClose={() => setPickerOpen(false)} onClick={event => {
