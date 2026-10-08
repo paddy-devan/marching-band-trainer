@@ -15,8 +15,8 @@ const targets = [
 
 describe('persistent anticipatory beater', () => {
   it('hovers above the first note at rest, including an opening rest', () => {
-    expect(malletPose(targets, 0, 1, false)).toMatchObject({ x: 282, y: 475 });
-    expect(malletPose(targets.map(t => ({ ...t, time: t.time + 2 })), 1, 1, true)).toMatchObject({ x: 282, y: 475 });
+    expect(malletPose(targets, 0, 1, false)).toMatchObject({ x: 282, y: 479 });
+    expect(malletPose(targets.map(t => ({ ...t, time: t.time + 2 })), 1, 1, true)).toMatchObject({ x: 282, y: 479 });
   });
 
   it('strikes, rebounds, travels and arrives above the next note before its attack', () => {
@@ -24,14 +24,14 @@ describe('persistent anticipatory beater', () => {
     const traveling = malletPose(targets, 0.2, 1, true);
     expect(traveling.x).toBeGreaterThan(105);
     expect(traveling.x).toBeLessThan(282);
-    expect(malletPose(targets, 0.4, 1, true)).toMatchObject({ x: 105, y: 460 });
+    expect(malletPose(targets, 0.4, 1, true)).toMatchObject({ x: 105, y: 464 });
     expect(malletPose(targets, 0.5, 1, true)).toMatchObject({ x: 105, y: 470 });
   });
 
   it('bounces for repeated pitches and remains visible after the last note', () => {
-    expect(malletPose(targets, 0.9, 1, true)).toMatchObject({ x: 105, y: 460 });
+    expect(malletPose(targets, 0.9, 1, true)).toMatchObject({ x: 105, y: 464 });
     expect(malletPose(targets, 1, 1, true)).toMatchObject({ x: 105, y: 470 });
-    expect(malletPose(targets, 5, 1, false)).toMatchObject({ x: 105, y: 460 });
+    expect(malletPose(targets, 5, 1, false)).toMatchObject({ x: 105, y: 464 });
   });
 
   it('freezes on pause, adapts to tempo and seeks without stale animation state', () => {
@@ -40,7 +40,7 @@ describe('persistent anticipatory beater', () => {
     // Fast passages compress the travel so the beater reaches the next attack.
     expect(malletPose(targets, 0.3, 1.5, true).x).toBeLessThan(malletPose(targets, 0.2, 1, true).x);
     expect(malletPose(targets, 0.5, 1.5, true)).toMatchObject({ x: 105, y: 470 });
-    expect(malletPose(targets, 0, 1, false).y).toBe(475);
+    expect(malletPose(targets, 0, 1, false).y).toBe(479);
     expect(Object.values(malletPose([], 0, 1, false)).every(Number.isFinite)).toBe(true);
   });
 

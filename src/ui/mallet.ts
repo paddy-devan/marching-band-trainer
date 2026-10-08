@@ -1,7 +1,7 @@
 export type MalletTarget = { time: number; pitch: number; x: number; y: number };
 // Keep the lifted head close to its target: a larger vertical lift can put it
 // over the neighbouring bar in this tightly spaced, front-facing instrument.
-const HOVER = 10;
+const HOVER = 6;
 const ease = (n: number) => {
   const t = Math.max(0, Math.min(1, n));
   return t * t * (3 - 2 * t);

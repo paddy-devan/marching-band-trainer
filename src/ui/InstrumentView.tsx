@@ -34,20 +34,33 @@ export function lyreBars(part: Part) {
   const span = Math.max(1, slot(part.register.max) - bottom);
   for (let pitch = part.register.min; pitch <= part.register.max; pitch++) {
     const accidental = [1, 3, 6, 8, 10].includes(pitch % 12);
-    const ratio = (pitch - part.register.min) / Math.max(1, part.register.max - part.register.min);
-    bars.push({ pitch, x: accidental ? 65 : 242, y: 478 - (slot(pitch) - bottom) / span * 418, width: 155 - ratio * 32, accidental });
+    const ratio = (slot(pitch) - bottom) / span;
+    const width = 188 - ratio * 80;
+    // Both columns have straight inner edges, with longer low bars extending
+    // outwards toward the wide base of the photographed instrument.
+    bars.push({ pitch, x: accidental ? 234 - width : 250, y: 568 - ratio * 496, width, accidental });
   }
   return bars;
 }
 function Lyre({ part, active, position, movements = active, speed = 1, playing = false }: Props) {
   const bars = useMemo(() => lyreBars(part), [part]);
+  const rails = useMemo(() => [true, false].flatMap(accidental => {
+    const column = bars.filter(bar => bar.accidental === accidental);
+    if (!column.length) return [];
+    const low = column[0];
+    const high = column[column.length - 1];
+    return [0.23, 0.77].map(offset => ({
+      topX: high.x + high.width * offset, topY: high.y - 24,
+      bottomX: low.x + low.width * offset, bottomY: low.y + 48,
+    }));
+  }), [bars]);
   const targets = useMemo(() => {
     const result: MalletTarget[] = [];
     for (const movement of movements) {
       if (movement.percussion) continue;
       const bar = bars.find(b => b.pitch === movement.pitch + part.register.transpose);
       if (!bar) continue;
-      const target = { time: movement.time, pitch: bar.pitch, x: bar.x + 40, y: bar.y + 7 };
+      const target = { time: movement.time, pitch: bar.pitch, x: bar.x + bar.width / 2, y: bar.y + 7 };
       const previous = result.at(-1);
       // A single beater cues the lowest pitch of a simultaneous chord.
       if (previous && Math.abs(previous.time - target.time) < 1e-8) {
@@ -59,17 +72,28 @@ function Lyre({ part, active, position, movements = active, speed = 1, playing =
   const pose = malletPose(targets, position, speed, playing);
   const pitches = new Set(active.map(m => m.pitch + part.register.transpose));
   const outside = [...pitches].filter(p => p < part.register.min || p > part.register.max);
+  const frame = 'M20.65 94.95 A44 44 0 0 1 105.29 117.89 L24 555 C8 611 47 640 117 642 Q240 655 363 642 C433 640 472 611 456 555 L374.71 117.89 A44 44 0 0 1 459.35 94.95';
   return <div className="lyre-view">
-    <svg viewBox="0 0 480 540" role="img" aria-label={`Bell lyre, ${pitchLabel(part.register.min)} to ${pitchLabel(part.register.max)}${outside.length ? ', note out of range' : ''}`} className="instrument-svg lyre">
-      <path d="M90 53 C25 26 7 77 44 108 L23 450 Q8 511 83 510 H395 Q462 511 442 450 L418 108 C459 76 434 26 387 53" className="lyre-frame" />
-      <path d="M117 45 L73 488 M205 45 L199 488 M285 45 L278 488 M374 45 L421 488" className="lyre-rails" />
-      {bars.map(b => <g key={b.pitch}>
-        <rect x={b.x} y={b.y} width={b.width} height="19" rx="3" className={`lyre-bar ${pitches.has(b.pitch) ? 'lit' : ''}`} />
-        <circle cx={b.x + 9} cy={b.y + 9.5} r="2" className="bar-pin" />
-        <text x={b.x + b.width - 9} y={b.y + 13} textAnchor="end" className="bar-letter">{pitchLabel(b.pitch, undefined, 'sharps')}</text>
-      </g>)}
-      <g className={`mallet ${playing ? 'moving' : ''}`} style={{ transform: `translate(${pose.x}px, ${pose.y}px)`, '--rest-pose': `translate(${pose.previewX}px, ${pose.previewY}px)` } as CSSProperties}>
-        <line x1="0" y1="0" x2="-38" y2="59" /><circle cx="0" cy="0" r="8" />
+    <svg viewBox="-30 0 540 660" role="img" aria-label={`Bell lyre, ${pitchLabel(part.register.min)} to ${pitchLabel(part.register.max)}${outside.length ? ', note out of range' : ''}`} className="instrument-svg lyre">
+      <g transform="translate(-28.8 0) scale(1.12 1)">
+        {rails.map((rail, index) => <g key={index} className="lyre-support">
+          <line x1={rail.topX} y1={rail.topY} x2={rail.bottomX} y2={rail.bottomY} className="lyre-rail" />
+          <line x1={rail.topX - 2} y1={rail.topY + 4} x2={rail.bottomX - 2} y2={rail.bottomY - 4} className="lyre-rail-shine" />
+        </g>)}
+        <path d={frame} className="lyre-frame" />
+        <path d={frame} className="lyre-frame-metal" />
+        <path d={frame} transform="translate(-1.2 -1)" className="lyre-frame-shine" />
+        {bars.map(b => {
+          const octave = Math.floor(b.pitch / 12) - 1;
+          const name = pitchLabel(b.pitch, undefined, 'sharps').slice(0, -String(octave).length);
+          return <g key={b.pitch}>
+            <rect x={b.x} y={b.y} width={b.width} height="28" rx="0.8" className={`lyre-bar ${pitches.has(b.pitch) ? 'lit' : ''}`} />
+            <text x={b.accidental ? b.x + b.width - 8 : b.x + 8} y={b.y + 21} textAnchor={b.accidental ? 'end' : 'start'} className="bar-letter">{name}<tspan className="bar-octave" dy="1">{octave}</tspan></text>
+          </g>;
+        })}
+        <g className={`mallet ${playing ? 'moving' : ''}`} style={{ transform: `translate(${pose.x}px, ${pose.y}px)`, '--rest-pose': `translate(${pose.previewX}px, ${pose.previewY}px)` } as CSSProperties}>
+          <line x1="0" y1="0" x2="-38" y2="59" /><circle cx="0" cy="0" r="8" />
+        </g>
       </g>
     </svg>
     {outside.length ? <p className="range-warning" role="status">Out of range: {outside.map(p => pitchLabel(p)).join(', ')}</p> : null}

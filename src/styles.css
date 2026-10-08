@@ -72,8 +72,13 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .instrument-stage { min-height: 325px; display: flex; align-items: center; justify-content: center; background: #fff; }
 .instrument-svg { display: block; width: 100%; max-width: 460px; max-height: 360px; overflow: visible; }
 .lyre { max-height: 420px; margin-inline: auto; }.lyre-view { width: 100%; }
-.lyre-frame { fill: none; stroke: #91a2ad; stroke-width: 6; stroke-linecap: round; }.lyre-rails { stroke: #cbd3d9; stroke-width: 9; }
-.lyre-bar { fill: #e7ecef; stroke: #a9bac5; stroke-width: 1; transition: fill .025s; }.lyre-bar.lit { fill: var(--cyan); stroke: var(--cyan-dark); }.bar-pin { fill: #9badb9; }.bar-letter { font-size: 11px; fill: var(--ink); }
+.lyre-frame, .lyre-frame-metal, .lyre-frame-shine { fill: none; stroke-linecap: butt; stroke-linejoin: round; }
+.lyre-frame { stroke: #8998a4; stroke-width: 10; }.lyre-frame-metal { stroke: #d8e0e5; stroke-width: 6; }.lyre-frame-shine { stroke: #f8fafb; stroke-width: 1.5; opacity: .8; }
+.lyre-rail { stroke: #49545d; stroke-width: 11; stroke-linecap: round; }.lyre-rail-shine { stroke: #75818a; stroke-width: 2; opacity: .65; }
+.lyre-bar { fill: #e6ebee; stroke: #a1adb5; stroke-width: .8; transition: fill .025s; }.lyre-bar.lit { fill: var(--cyan); stroke: var(--cyan-dark); }
+.bar-letter { font-size: 20px; font-weight: 500; fill: #36434d; }
+.bar-octave { font-size: .7em; font-weight: 400; fill: #56636d; }
+.lyre-bar.lit + .bar-letter .bar-octave { fill: #354b57; }
 .mallet line { stroke: #83949e; stroke-width: 5; stroke-linecap: round; }.mallet circle { fill: var(--cyan); stroke: var(--cyan-dark); stroke-width: 2; }
 .mallet.moving { transition: transform .025s linear; }
 .drum-shell { fill: #d9e2e7; stroke: #8b9da8; stroke-width: 3; }.drum-head { fill: #f5f7f8; stroke: #8b9da8; stroke-width: 4; }.drum-rim { stroke: #8b9da8; stroke-width: 5; }.drum-inner { fill: none; stroke: #e0e5e9; stroke-width: 2; }

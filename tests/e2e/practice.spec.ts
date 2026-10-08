@@ -53,8 +53,8 @@ test('desktop practice controls change real playback and keep following independ
   const firstHead = await beater.locator('circle').boundingBox();
   const firstBar = await page.locator('.lyre-bar.lit').boundingBox();
   const headCentre = firstHead!.y + firstHead!.height / 2;
-  expect(headCentre).toBeLessThan(firstBar!.y);
-  expect(headCentre).toBeGreaterThan(firstBar!.y - 10);
+  expect(headCentre).toBeGreaterThan(firstBar!.y);
+  expect(headCentre).toBeLessThan(firstBar!.y + firstBar!.height / 4);
   const startPose = await beater.getAttribute('style');
   await seek.fill('0.2');
   const intermediatePose = await beater.getAttribute('style');
