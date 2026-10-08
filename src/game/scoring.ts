@@ -1,0 +1,69 @@
+import type { Part, Timeline } from '../score/model';
+
+export type Target = { id: string; time: number; pitch: number; window: number };
+export type Judgement = 'Perfect' | 'Early' | 'Late' | 'Wrong note' | 'Extra tap';
+export type Result = { stars: number; perfect: number; close: number; missed: number; extras: number; total: number };
+
+// Movements already contain expanded repeats and joined ties. Duplicate voices
+// at the same pitch/onset need one physical strike; chords keep separate pitches.
+export function gameTargets(timeline: Timeline, part: Part, speed: number): Target[] {
+  const unique = new Map<string, Target>();
+  for (const movement of timeline.movements) {
+    if (movement.partId !== part.id || movement.percussion) continue;
+    const pitch = movement.pitch + part.register.transpose;
+    unique.set(`${movement.time}:${pitch}`, { id: movement.id, time: movement.time, pitch, window: 0.15 });
+  }
+  const targets = [...unique.values()].sort((a, b) => a.time - b.time || a.pitch - b.pitch);
+  const onsets = [...new Set(targets.map(t => t.time))];
+  const windows = new Map(onsets.map((time, index) => [time, Math.min(0.15,
+    index > 0 ? (time - onsets[index - 1]) / speed / 2 : Infinity,
+    index < onsets.length - 1 ? (onsets[index + 1] - time) / speed / 2 : Infinity,
+  )]));
+  for (const target of targets) target.window = windows.get(target.time)!;
+  return targets;
+}
+
+export class Attempt {
+  private judged = new Map<string, number>();
+  private extras = 0;
+  constructor(readonly targets: Target[], readonly speed: number) {}
+
+  advance(position: number) {
+    let missed = 0;
+    for (const target of this.targets) {
+      if (target.time + target.window * this.speed >= position) break;
+      if (!this.judged.has(target.id)) { this.judged.set(target.id, 0); missed++; }
+    }
+    return missed;
+  }
+
+  tap(pitch: number, position: number): Judgement {
+    this.advance(position);
+    // A queued input can arrive after a render frame has expired the note. Its
+    // original event timestamp still earns credit; successful hits stay claimed.
+    const available = this.targets.filter(t => (this.judged.get(t.id) ?? 0) === 0 && Math.abs(position - t.time) / this.speed <= t.window + 1e-8);
+    const target = available.filter(t => t.pitch === pitch).sort((a, b) => Math.abs(position - a.time) - Math.abs(position - b.time))[0];
+    if (!target) { this.extras++; return available.length ? 'Wrong note' : 'Extra tap'; }
+    const error = (position - target.time) / this.speed;
+    const distance = Math.abs(error);
+    const perfect = distance <= Math.min(0.05, target.window * 0.5) + 1e-8;
+    const weight = perfect ? 1 : distance <= Math.min(0.1, target.window * 0.8) ? 0.7 : 0.3;
+    this.judged.set(target.id, weight);
+    return perfect ? 'Perfect' : error < 0 ? 'Early' : 'Late';
+  }
+
+  isJudged(id: string) { return this.judged.has(id); }
+
+  finish(): Result {
+    for (const target of this.targets) if (!this.judged.has(target.id)) this.judged.set(target.id, 0);
+    const values = [...this.judged.values()];
+    const points = values.reduce((sum, n) => sum + n, 0) - this.extras * 0.25;
+    return {
+      stars: this.targets.length ? Math.round(10 * Math.max(0, points) / this.targets.length) : 0,
+      perfect: values.filter(n => n === 1).length,
+      close: values.filter(n => n > 0 && n < 1).length,
+      missed: values.filter(n => n === 0).length,
+      extras: this.extras, total: this.targets.length,
+    };
+  }
+}

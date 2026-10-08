@@ -99,6 +99,20 @@ Link directly to a score with its filename ID as a URL fragment, for example `ht
 
 Audio starts after pressing Play. The transport uses the Web Audio clock with a short lookahead, and visual state derives from that clock. Pause, seek, speed changes, restart and score changes cancel scheduled sources. A suspended audio context pauses the transport and prompts the student to press Play again. Skipped scheduling windows after background-tab delays do not replay old attacks in a burst.
 
+## Bell lyre challenge
+
+Choose **Bell lyre challenge** on a score with a playable lyre part. The dedicated screen replaces the normal score controls with a touchable instrument. Phone portrait is the primary layout; mouse and keyboard activation of the note buttons also work on desktop. Challenge links use `#colonel-bogey/challenge`; browser Back/Forward works between the score and challenge.
+
+Before starting, choose 25–150% speed, advance note outlines, a metronome, and optional bell lyre backing. Defaults are 75% speed, outlines on, and metronome/backing off. A full-bar audible count-in follows the piece's starting meter, including compound beats and pickups. Taps during the count-in let the player find the bars and do not affect the score. All percussion parts stay audible regardless of the normal score's mute/solo controls. Each tap sounds its actual pitch, independently of the quieter automatic lyre backing.
+
+Tap each written attack once. Joined ties require one strike; repeated notes require separate strikes; simultaneous pitches accept separate fingers. Current-bar notes remain readable with advance outlines switched off. Timing uses input timestamps mapped to the audio output clock where supported, with a latency-based fallback. The initial full-credit window is at most ±50 ms, with decreasing partial credit out to ±150 ms. Closely spaced attacks narrow the windows to avoid claiming the neighbouring note. These windows use real time at every speed.
+
+The result is an **integer number of stars out of ten**: weighted hit credit, less 0.25 points per wrong/extra tap, divided by the number of expected attacks, multiplied by ten, rounded, and clamped to 0–10. Missing notes earn zero; tapping repeatedly cannot claim the same attack twice. All ten grey stars appear immediately, then the earned stars fill one at a time with ascending synthesized chimes. Star sounds can be switched off, and reduced-motion preferences remove the pop animation. Accuracy is separate from assistance: slower or aided attempts can still earn ten stars, with their settings shown beside the result.
+
+Results exist only in memory and are cleared when retrying, leaving, or reloading. Stop returns to setup with the chosen settings. Backgrounding the page or losing audio interrupts the attempt and offers a fresh start without awarding a partial score. Parts containing notes outside their configured lyre register do not offer the challenge.
+
+Unit checks cover scoring, chords, duplicate unisons, ties, repeat passes, speed, count-in, compound meter, and audio timing/cancellation. Browser checks cover entry/settings, touch input, responsive bounds, history, interruptions, ten sequential star reveals with scheduled sounds, zero-star attempts, retry, and reduced motion. Real iOS/Android touch feel and audio latency still need device verification.
+
 ## Instrument and interpretation configuration
 
 Edit **`trainer.config.json`** only for exceptions. Do not duplicate titles, tempo, keys or note sequences. Each entry uses the score filename without `.mscz`, an exact visible part name, and optionally the native instrument ID:
@@ -170,6 +184,7 @@ The visible instrument renderer is a replaceable SVG placeholder, not a full she
 - `src/score/repeats.ts`: repeat/ending order, shared playback expansion, tempo/key restoration and ties across adjacent played bars. Written bar numbers remain visible while seek/time use the expanded duration. Expansion is bounded to 10,000 bars and 200,000 notes.
 - `src/score/interpret.ts`: native tie joins, roll skeletons, tempo conversion and separate audio contacts.
 - `src/audio/transport.ts`: audio-clock scheduling, cancellation and per-part mixing.
+- `src/audio/beats.ts`, `src/game/scoring.ts`: count-in/metronome timing and stateless bell lyre challenge judging.
 - `src/ui/`: catalogue, transport/part controls, practice screen and instrument renderers. Renderers consume normalised movements rather than native XML.
 - `tests/`: fixture/synthetic notation tests, catalogue regeneration, deterministic transport tests and real-browser interaction checks.
 
