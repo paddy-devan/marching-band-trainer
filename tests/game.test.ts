@@ -42,6 +42,23 @@ describe('bell lyre challenge scoring', () => {
     expect(missed.tap(84, 1.08)).toBe('Extra tap');
     expect(missed.finish()).toMatchObject({ stars: 0, missed: 1 });
   });
+  it('allows perfect hits up to 65 ms either side at every speed', () => {
+    for (const speed of [0.5, 1, 1.5]) {
+      for (const offset of [-0.065, 0.065]) {
+        expect(new Attempt([target(1)], speed).tap(84, 1 + offset * speed)).toBe('Perfect');
+      }
+      expect(new Attempt([target(1)], speed).tap(84, 1 - 0.066 * speed)).toBe('Early');
+      expect(new Attempt([target(1)], speed).tap(84, 1 + 0.066 * speed)).toBe('Late');
+    }
+  });
+  it('widens perfect hits on dense passages while keeping neighbouring strikes separate', () => {
+    const targets = [target(1, 84, 'first', 0.05), target(1.1, 84, 'second', 0.05)];
+    const attempt = new Attempt(targets, 1);
+    expect(attempt.tap(84, 1.0325)).toBe('Perfect');
+    expect(attempt.tap(84, 1.0675)).toBe('Perfect');
+    expect(new Attempt(targets, 1).tap(84, 1.033)).toBe('Late');
+    expect(attempt.finish()).toMatchObject({ stars: 10, perfect: 2, extras: 0 });
+  });
   it('credits queued inputs by their original timestamp after a render frame expires the target', () => {
     const attempt = new Attempt([target(1)], 1);
     expect(attempt.advance(1.2)).toBe(1);

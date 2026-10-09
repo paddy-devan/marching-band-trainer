@@ -56,7 +56,7 @@ export class Attempt {
     }
     const error = (position - target.time) / this.speed;
     const distance = Math.abs(error);
-    const perfect = distance <= Math.min(0.05, target.window * 0.5) + 1e-8;
+    const perfect = distance <= Math.min(0.065, target.window * 0.65) + 1e-8;
     const weight = perfect ? 1 : distance <= Math.min(0.1, target.window * 0.8) ? 0.7 : 0.3;
     this.judged.set(target.id, weight);
     this.hitEvents.set(target.id, { time: position, order: this.eventOrder++ });

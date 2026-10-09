@@ -36,7 +36,7 @@ function GameResult({ result, transport, settings, onRetry, onExit }: {
     const timers = Array.from({ length: result.stars }, (_, index) => window.setTimeout(() => {
       setRevealed(index + 1);
       if (soundRef.current) transport.revealStar(index);
-    }, 400 + index * 330));
+    }, 300 + index * 240));
     return () => timers.forEach(clearTimeout);
   }, [result.stars, transport]);
   return <section className="game-result game-card" aria-labelledby="game-result-title">
@@ -161,6 +161,7 @@ export function LyreGame({ timeline, onExit }: { timeline: Timeline; onExit: () 
     ? targets.filter(t => t.time === next.time && !attempt.current?.isJudged(t.id)).map(t => t.pitch) : []);
   const visibleFeedback = (position - feedback.at) / settings.speed < 0.4 ? feedback : undefined;
   const perfectStreak = attempt.current?.perfectStreak().current ?? 0;
+  const streakTier = perfectStreak >= 30 ? 'spark' : perfectStreak >= 20 ? 'glow' : perfectStreak >= 10 ? 'bright' : 'calm';
   const count = position < 0 ? Math.min(leadIn.beats, Math.floor((position + leadIn.duration) / leadIn.interval) + 1) : 0;
   return <main className={`lyre-game game-${phase}`}>
     <header className="game-header"><button onClick={() => { stop(); onExit(); }} aria-label="Back to score">← <span>Score</span></button><div><span className="game-eyebrow">Bell lyre challenge</span><h1 ref={heading} tabIndex={-1}>{timeline.score.title}</h1></div>{phase === 'running' ? <button onClick={() => stop()}>Stop</button> : <span className="game-header-star" aria-hidden="true">✦</span>}</header>
@@ -183,8 +184,11 @@ export function LyreGame({ timeline, onExit }: { timeline: Timeline; onExit: () 
       <div className="game-progress"><progress aria-label="Piece progress" max={timeline.duration} value={Math.max(0, position)} /><span>{Math.round(settings.speed * 100)}% · {position < 0 ? 'Count-in' : `Bar ${(measure.sourceIndex ?? measure.index) + 1}`}</span></div>
       <div className="game-playing-status" aria-live="off">
         {position < 0 ? <span className="game-count-in">Count in {count} / {leadIn.beats}</span> : <>
-          {visibleFeedback?.text === 'Perfect' ? <span className="game-perfect" key={feedback.at}>Perfect!</span> : null}
-          {perfectStreak >= 3 ? <span className="game-perfect-streak">✦ Perfect streak · {perfectStreak}</span> : null}
+          <span className="game-perfect-slot">{visibleFeedback?.text === 'Perfect' ? <span className="game-perfect" key={feedback.at}>Perfect!</span> : null}</span>
+          {perfectStreak >= 3 ? <span className={`game-perfect-streak streak-${streakTier}`}>
+            <span className="game-streak-spark" aria-hidden="true">✦</span>
+            <span>Perfect streak ·</span><strong className="game-streak-count">{perfectStreak}</strong>
+          </span> : null}
         </>}
       </div>
       <GameBoard part={part} cuePitches={cuePitches} feedback={visibleFeedback} onTap={tap} />
