@@ -13,7 +13,7 @@ describe('bell lyre challenge scoring', () => {
     expect(attempt.tap(84, 0.025)).toBe('Perfect');
     expect(attempt.tap(84, 0.92)).toBe('Early');
     expect(attempt.tap(84, 2.13)).toBe('Late');
-    expect(attempt.finish()).toEqual({ stars: 5, perfect: 1, close: 2, missed: 1, extras: 0, total: 4 });
+    expect(attempt.finish()).toEqual({ stars: 5, perfect: 1, close: 2, missed: 1, extras: 0, total: 4, longestPerfectStreak: 1 });
   });
   it('claims each repeated note once, penalises extra/wrong taps, and cannot claim future notes', () => {
     const attempt = new Attempt([target(0), target(1), target(2, 86)], 1);
@@ -87,6 +87,48 @@ describe('bell lyre challenge scoring', () => {
     attempt.tap(targets[0].pitch, 0);
     attempt.advance(timeline.duration);
     expect(attempt.finish()).toMatchObject({ stars: 10, perfect: 1, missed: 0 });
+  });
+  it('tracks consecutive perfect attacks, resets on timing errors, and retains the longest streak', () => {
+    const attempt = new Attempt(Array.from({ length: 8 }, (_, i) => target(i)), 1);
+    attempt.tap(84, 0);
+    attempt.tap(84, 1);
+    expect(attempt.perfectStreak()).toEqual({ current: 2, longest: 2 });
+    attempt.tap(84, 2);
+    expect(attempt.perfectStreak()).toEqual({ current: 3, longest: 3 });
+    attempt.tap(84, 3.08);
+    expect(attempt.perfectStreak()).toEqual({ current: 0, longest: 3 });
+    for (let time = 4; time < 8; time++) attempt.tap(84, time);
+    expect(attempt.perfectStreak()).toEqual({ current: 4, longest: 4 });
+    expect(attempt.finish().longestPerfectStreak).toBe(4);
+    expect(new Attempt([target(0)], 1).finish().longestPerfectStreak).toBe(0);
+  });
+  it('breaks perfect streaks on missed notes, wrong notes, and extra taps, including during rests', () => {
+    const attempt = new Attempt(Array.from({ length: 9 }, (_, i) => target(i)), 1);
+    for (let time = 0; time < 3; time++) attempt.tap(84, time);
+    attempt.tap(84, 2.5); // extra tap during a rest
+    expect(attempt.perfectStreak()).toEqual({ current: 0, longest: 3 });
+    attempt.tap(84, 3);
+    attempt.tap(84, 4);
+    attempt.advance(5.2);
+    expect(attempt.perfectStreak()).toEqual({ current: 0, longest: 3 });
+    attempt.tap(84, 6);
+    attempt.tap(86, 7);
+    expect(attempt.perfectStreak()).toEqual({ current: 0, longest: 3 });
+    attempt.tap(84, 7.03);
+    attempt.tap(84, 8);
+    expect(attempt.finish()).toMatchObject({ longestPerfectStreak: 3, missed: 1, extras: 2 });
+  });
+  it('restores a streak for timely queued inputs and counts simultaneous pitches once each', () => {
+    const attempt = new Attempt([target(0, 84, 'a'), target(0, 88, 'b'), target(1)], 1);
+    attempt.tap(84, 0);
+    attempt.tap(88, 0);
+    attempt.advance(1.2);
+    expect(attempt.perfectStreak()).toEqual({ current: 0, longest: 2 });
+    attempt.tap(84, 1.02);
+    expect(attempt.perfectStreak()).toEqual({ current: 3, longest: 3 });
+    expect(attempt.finish().longestPerfectStreak).toBe(3);
+    attempt.tap(84, 1.02);
+    expect(attempt.perfectStreak()).toEqual({ current: 0, longest: 3 });
   });
 });
 

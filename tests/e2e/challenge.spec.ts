@@ -26,6 +26,8 @@ test('challenge entry, settings, touch targets, stop, and browser history work o
   await expect(page.getByRole('slider')).toHaveCount(0);
   await expect(page.locator('.game-bar')).toHaveCount(25);
   await expect(page.locator('.game-bar.cued')).toHaveCount(0);
+  await expect(page.locator('.game-music')).toHaveCount(0);
+  await expect(page.locator('.game-playing-status small')).toHaveCount(0);
   await page.getByRole('button', { name: 'Play C6', exact: true }).dispatchEvent('pointerdown', { pointerType: 'touch', button: 0 });
   await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   await page.screenshot({ path: path.join(tmpdir(), 'marching-band-challenge-phone.png') });
@@ -60,8 +62,8 @@ test('a completed attempt reveals ten integer stars one by one with sounds and r
   const xml = `<museScore version="4.70"><Score><Division>480</Division>
     <Part><Staff id="1"><StaffType group="pitched" /></Staff><trackName>Bell Lyre</trackName><Instrument id="piano"><useDrumset>0</useDrumset></Instrument></Part>
     <Part><Staff id="2"><StaffType group="percussion" /></Staff><trackName>Side Drum</trackName><Instrument id="snare-drum"><useDrumset>1</useDrumset><Drum pitch="38"><name>Acoustic Snare</name><line>0</line></Drum></Instrument></Part>
-    <Staff id="1"><Measure><voice><TimeSig><sigN>1</sigN><sigD>4</sigD></TimeSig><Tempo><tempo>2</tempo></Tempo><Chord><durationType>quarter</durationType><Note><pitch>60</pitch><tpc>14</tpc></Note></Chord></voice></Measure></Staff>
-    <Staff id="2"><Measure><voice><TimeSig><sigN>1</sigN><sigD>4</sigD></TimeSig><Chord><durationType>quarter</durationType><Note><pitch>38</pitch><tpc>14</tpc></Note></Chord></voice></Measure></Staff>
+    <Staff id="1"><Measure><voice><TimeSig><sigN>3</sigN><sigD>4</sigD></TimeSig><Tempo><tempo>2</tempo></Tempo>${'<Chord><durationType>quarter</durationType><Note><pitch>60</pitch><tpc>14</tpc></Note></Chord>'.repeat(3)}</voice></Measure></Staff>
+    <Staff id="2"><Measure><voice><TimeSig><sigN>3</sigN><sigD>4</sigD></TimeSig>${'<Chord><durationType>quarter</durationType><Note><pitch>38</pitch><tpc>14</tpc></Note></Chord>'.repeat(3)}</voice></Measure></Staff>
   </Score></museScore>`;
   const archive = zipSync({ 'challenge.mscx': strToU8(xml) });
   await page.route('**/generated/scores/*colonel-bogey.mscz', route => route.fulfill({ body: Buffer.from(archive), contentType: 'application/octet-stream' }));
@@ -69,7 +71,7 @@ test('a completed attempt reveals ten integer stars one by one with sounds and r
   // attack so this integration check doesn't depend on CI/automation latency.
   await page.addInitScript(() => {
     const original = AudioContext.prototype.createOscillator;
-    const data = { context: undefined as AudioContext | undefined, notes: [] as { frequency: number; when: number }[], counts: [] as number[] };
+    const data = { context: undefined as AudioContext | undefined, notes: [] as { frequency: number; when: number; scheduled: boolean }[], counts: [] as number[] };
     Object.assign(window, { challengeAudio: data });
     AudioContext.prototype.createOscillator = function () {
       data.context = this;
@@ -78,7 +80,7 @@ test('a completed attempt reveals ten integer stars one by one with sounds and r
       const setFrequency = oscillator.frequency.setValueAtTime.bind(oscillator.frequency);
       oscillator.frequency.setValueAtTime = (value, when) => { frequency = value; return setFrequency(value, when); };
       const start = oscillator.start.bind(oscillator);
-      oscillator.start = (when = 0) => { data.notes.push({ frequency, when }); start(when); };
+      oscillator.start = (when = 0) => { data.notes.push({ frequency, when, scheduled: when > this.currentTime + 0.001 }); start(when); };
       return oscillator;
     };
     new MutationObserver(() => {
@@ -92,28 +94,36 @@ test('a completed attempt reveals ten integer stars one by one with sounds and r
   await page.goto('./#colonel-bogey/challenge');
   await page.getByRole('button', { name: '100%', exact: true }).click();
   await page.getByRole('button', { name: 'Start attempt' }).click();
-  await expect.poll(() => page.evaluate(() => {
-    const data = (window as unknown as { challengeAudio: { notes: { frequency: number }[] } }).challengeAudio;
-    return data.notes.some(n => Math.abs(n.frequency - 1046.502) < 1);
-  }), { intervals: [10] }).toBe(true);
-  await page.evaluate(() => {
-    const data = (window as unknown as { challengeAudio: { context: AudioContext; notes: { frequency: number; when: number }[] } }).challengeAudio;
-    const note = data.notes.find(n => Math.abs(n.frequency - 1046.502) < 1)!;
-    const ts = data.context.getOutputTimestamp();
-    const stamp = ts.contextTime && ts.performanceTime
-      ? ts.performanceTime + (note.when - ts.contextTime) * 1000
-      : performance.now() + (note.when - data.context.currentTime + data.context.baseLatency + (data.context.outputLatency || 0)) * 1000;
-    const event = new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', button: 0 });
-    Object.defineProperty(event, 'timeStamp', { value: stamp });
-    document.querySelector('[data-pitch="84"]')!.dispatchEvent(event);
-  });
-  await expect(page.locator('.game-playing-status')).toContainText('Perfect');
+  await expect(page.getByRole('button', { name: 'Play C6', exact: true })).toHaveClass(/cued/);
+  await expect(page.locator('.game-count-in')).toHaveText('Count in 2 / 3'); // cues now precede the old half-second window
+  for (let index = 0; index < 3; index++) {
+    await expect.poll(() => page.evaluate(() => {
+      const data = (window as unknown as { challengeAudio: { notes: { frequency: number; scheduled: boolean }[] } }).challengeAudio;
+      return data.notes.filter(n => n.scheduled && Math.abs(n.frequency - 1046.502) < 1).length;
+    }), { intervals: [10] }).toBe(index + 1);
+    await page.evaluate(index => {
+      const data = (window as unknown as { challengeAudio: { context: AudioContext; notes: { frequency: number; when: number; scheduled: boolean }[] } }).challengeAudio;
+      const note = data.notes.filter(n => n.scheduled && Math.abs(n.frequency - 1046.502) < 1)[index];
+      const ts = data.context.getOutputTimestamp();
+      const stamp = ts.contextTime && ts.performanceTime
+        ? ts.performanceTime + (note.when - ts.contextTime) * 1000
+        : performance.now() + (note.when - data.context.currentTime + data.context.baseLatency + (data.context.outputLatency || 0)) * 1000;
+      const event = new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', button: 0 });
+      Object.defineProperty(event, 'timeStamp', { value: stamp });
+      document.querySelector('[data-pitch="84"]')!.dispatchEvent(event);
+    }, index);
+    await expect(page.locator('.game-playing-status')).toContainText('Perfect!');
+    if (index < 2) await expect(page.locator('.game-perfect-streak')).toHaveCount(0);
+  }
+  await expect(page.locator('.game-perfect-streak')).toHaveText('✦ Perfect streak · 3');
+  expect(await page.locator('.game-perfect').evaluate(el => getComputedStyle(el).color)).toBe('rgb(121, 80, 189)');
+  await page.screenshot({ path: path.join(tmpdir(), 'marching-band-challenge-streak.png') });
   await expect(page.locator('.game-result')).toBeVisible();
   await expect(page.locator('.game-star')).toHaveCount(10);
-  await expect(page.locator('.game-star.filled')).toHaveCount(0);
   await expect(page.locator('.game-star.filled')).toHaveCount(10, { timeout: 5000 });
   await expect(page.locator('.game-result-score')).toHaveText('10 / 10');
   await expect(page.locator('.game-aids')).toContainText('100% speed');
+  await expect(page.locator('.game-best-streak')).toHaveText('Longest perfect streak3');
   const audio = await page.evaluate(() => {
     const data = (window as unknown as { challengeAudio: { counts: number[]; notes: { frequency: number }[] } }).challengeAudio;
     return { counts: data.counts, sounds: data.notes.length };
@@ -127,9 +137,14 @@ test('a completed attempt reveals ten integer stars one by one with sounds and r
   await expect(page.locator('.game-result')).toHaveCount(0);
   await expect(page.getByLabel('Practice speed')).toHaveValue('100');
   await page.getByRole('button', { name: 'Start attempt' }).click();
+  await expect(page.locator('.game-count-in')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Play A5', exact: true }).dispatchEvent('pointerdown', { pointerType: 'touch', button: 0 });
+  await expect(page.locator('.game-playing-status')).toBeEmpty();
+  await expect(page.locator('.game-perfect-streak')).toHaveCount(0);
   await expect(page.locator('.game-result')).toBeVisible();
   await expect(page.locator('.game-result-score')).toHaveText('0 / 10');
   await expect(page.locator('.game-star.filled')).toHaveCount(0);
+  await expect(page.locator('.game-best-streak')).toHaveText('Longest perfect streak0');
   await page.getByRole('button', { name: 'Back to score', exact: true }).last().click();
   await expect(page.locator('.practice')).toBeVisible();
   expect(errors).toEqual([]);

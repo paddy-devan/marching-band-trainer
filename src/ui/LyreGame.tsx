@@ -6,7 +6,6 @@ import type { Part, Timeline } from '../score/model';
 import { positionAt } from '../score/interpret';
 import { value, add } from '../score/fraction';
 import { pitchLabel } from '../score/labels';
-import { barCues } from './BarNotes';
 import { lyreBars } from './InstrumentView';
 
 export function playableLyres(timeline: Timeline) {
@@ -19,7 +18,7 @@ export function playableLyres(timeline: Timeline) {
 
 type Settings = { speed: number; preview: boolean; metronome: boolean; backing: boolean };
 type Phase = 'setup' | 'running' | 'results';
-type Feedback = { pitch?: number; text: Judgement | 'Missed' | ''; at: number };
+type Feedback = { pitch?: number; text: Judgement | ''; at: number };
 
 function Star({ filled }: { filled: boolean }) {
   return <span className={`game-star${filled ? ' filled' : ''}`} aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 2 3.09 6.26 6.91 1-5 4.87 1.18 6.88L12 17.76l-6.18 3.25L7 14.13 2 9.26l6.91-1Z" /></svg></span>;
@@ -49,6 +48,7 @@ function GameResult({ result, transport, settings, onRetry, onExit }: {
     </div>
     <p className="game-result-score" aria-hidden="true">{revealed}<span> / 10</span></p>
     <p className="game-result-caption">{revealed < result.stars ? 'Finding your stars…' : result.stars === 10 ? 'All ten stars. Take a bow.' : 'Every attempt is a step forward.'}</p>
+    <p className="game-best-streak"><span>Longest perfect streak</span><strong>{result.longestPerfectStreak}</strong></p>
     <dl className="game-result-stats">
       <div><dt>Perfect</dt><dd>{result.perfect}</dd></div><div><dt>Early / late</dt><dd>{result.close}</dd></div>
       <div><dt>Missed</dt><dd>{result.missed}</dd></div><div><dt>Extra / wrong</dt><dd>{result.extras}</dd></div>
@@ -75,19 +75,10 @@ export function LyreGame({ timeline, onExit }: { timeline: Timeline; onExit: () 
   const request = useRef(0);
   const started = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
-  const music = useRef<HTMLDivElement>(null);
   const targets = useMemo(() => part ? gameTargets(timeline, part, settings.speed) : [], [timeline, part, settings.speed]);
-  const movements = useMemo(() => timeline.movements.filter(m => m.partId === partId), [timeline, partId]);
   const leadIn = useMemo(() => countIn(timeline), [timeline]);
   const beats = positionAt(timeline.score, Math.max(0, position));
   const measure = timeline.score.measures.find(m => beats >= value(m.start) && beats < value(add(m.start, m.duration))) || timeline.score.measures.at(-1)!;
-  const cues = useMemo(() => barCues(timeline.score, movements, measure), [timeline, movements, measure]);
-  const currentCue = cues.findIndex(c => position >= c.start && position < c.end);
-  useEffect(() => {
-    const row = music.current;
-    const cue = currentCue >= 0 ? row?.children[currentCue] as HTMLElement | undefined : undefined;
-    if (row && cue) row.scrollTo({ left: Math.max(0, cue.offsetLeft - row.offsetLeft - row.clientWidth / 3), behavior: 'instant' });
-  }, [currentCue, measure.index, phase]);
   useEffect(() => { if (phase === 'setup') heading.current?.focus(); }, [phase]);
 
   const changePhase = (next: Phase) => { phaseRef.current = next; setPhase(next); };
@@ -115,7 +106,7 @@ export function LyreGame({ timeline, onExit }: { timeline: Timeline; onExit: () 
         const state = transport.getSnapshot();
         const at = transport.readPosition();
         setPosition(at);
-        if (at >= 0 && attempt.current?.advance(at)) setFeedback({ text: 'Missed', at });
+        if (at >= 0) attempt.current?.advance(at);
         if (!state.playing) {
           if (state.position >= timeline.duration && attempt.current) {
             setResult(attempt.current.finish());
@@ -166,9 +157,10 @@ export function LyreGame({ timeline, onExit }: { timeline: Timeline; onExit: () 
 
   if (!part) return <main className="lyre-game"><div className="game-card"><h1>Bell lyre challenge unavailable</h1><p>This piece needs a bell lyre part with notes inside its playable range.</p><button onClick={onExit}>Back to score</button></div></main>;
   const next = targets.find(t => t.time >= position - 0.001 && !attempt.current?.isJudged(t.id));
-  const cuePitches = new Set(settings.preview && next && (next.time - position) / settings.speed <= 0.5
+  const cuePitches = new Set(settings.preview && next && (next.time - position) / settings.speed <= 0.8
     ? targets.filter(t => t.time === next.time && !attempt.current?.isJudged(t.id)).map(t => t.pitch) : []);
   const visibleFeedback = (position - feedback.at) / settings.speed < 0.4 ? feedback : undefined;
+  const perfectStreak = attempt.current?.perfectStreak().current ?? 0;
   const count = position < 0 ? Math.min(leadIn.beats, Math.floor((position + leadIn.duration) / leadIn.interval) + 1) : 0;
   return <main className={`lyre-game game-${phase}`}>
     <header className="game-header"><button onClick={() => { stop(); onExit(); }} aria-label="Back to score">← <span>Score</span></button><div><span className="game-eyebrow">Bell lyre challenge</span><h1 ref={heading} tabIndex={-1}>{timeline.score.title}</h1></div>{phase === 'running' ? <button onClick={() => stop()}>Stop</button> : <span className="game-header-star" aria-hidden="true">✦</span>}</header>
@@ -180,7 +172,7 @@ export function LyreGame({ timeline, onExit }: { timeline: Timeline; onExit: () 
         <div className="speed-presets">{[0.5, 0.75, 1, 1.25].map(speed => <button key={speed} aria-pressed={settings.speed === speed} onClick={() => setSettings(s => ({ ...s, speed }))}>{speed * 100}%</button>)}</div>
       </div>
       <div className="game-options">
-        <label><span><strong>Advance note cues</strong><small>Outline the next bars just before the strike.</small></span><input type="checkbox" checked={settings.preview} onChange={e => setSettings(s => ({ ...s, preview: e.target.checked }))} /></label>
+        <label><span><strong>Advance note cues</strong><small>Outline the next bars a little ahead of the strike.</small></span><input type="checkbox" checked={settings.preview} onChange={e => setSettings(s => ({ ...s, preview: e.target.checked }))} /></label>
         <label><span><strong>Metronome</strong><small>A steady click alongside the drums.</small></span><input type="checkbox" checked={settings.metronome} onChange={e => setSettings(s => ({ ...s, metronome: e.target.checked }))} /></label>
         <label><span><strong>Bell lyre backing</strong><small>Hear the written melody as you play.</small></span><input type="checkbox" checked={settings.backing} onChange={e => setSettings(s => ({ ...s, backing: e.target.checked }))} /></label>
       </div>
@@ -189,10 +181,12 @@ export function LyreGame({ timeline, onExit }: { timeline: Timeline; onExit: () 
       <button className="game-primary game-start" onClick={() => void start()}>Start attempt <span aria-hidden="true">→</span></button>
     </section> : phase === 'results' && result ? <GameResult result={result} settings={settings} transport={transport} onRetry={() => stop()} onExit={onExit} /> : <>
       <div className="game-progress"><progress aria-label="Piece progress" max={timeline.duration} value={Math.max(0, position)} /><span>{Math.round(settings.speed * 100)}% · {position < 0 ? 'Count-in' : `Bar ${(measure.sourceIndex ?? measure.index) + 1}`}</span></div>
-      <div className="game-music" ref={music} aria-label={`Current bar ${(measure.sourceIndex ?? measure.index) + 1}`}>
-        {cues.map((cue, index) => <span key={index} className={position >= cue.start && position < cue.end ? 'current' : position >= cue.end ? 'played' : ''}>{cue.movements.length ? [...new Set(cue.movements.map(m => pitchLabel(m.pitch + part.register.transpose, undefined, 'sharps')))].join(' + ') : 'Rest'}</span>)}
+      <div className="game-playing-status" aria-live="off">
+        {position < 0 ? <span className="game-count-in">Count in {count} / {leadIn.beats}</span> : <>
+          {visibleFeedback?.text === 'Perfect' ? <span className="game-perfect" key={feedback.at}>Perfect!</span> : null}
+          {perfectStreak >= 3 ? <span className="game-perfect-streak">✦ Perfect streak · {perfectStreak}</span> : null}
+        </>}
       </div>
-      <div className="game-playing-status" aria-live="off"><span className={visibleFeedback?.text === 'Perfect' ? 'perfect' : ''}>{position < 0 ? `Count in ${count} / ${leadIn.beats}` : visibleFeedback?.text || 'Tap with the drums'}</span>{position < 0 ? <small>Find your bars. These taps don’t count.</small> : <small>{settings.preview ? 'Follow the outlined bars' : 'Follow the music above'}</small>}</div>
       <GameBoard part={part} cuePitches={cuePitches} feedback={visibleFeedback} onTap={tap} />
     </>}
   </main>;
