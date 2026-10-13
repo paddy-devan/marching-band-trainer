@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
 import { InstrumentView, lyreBars, movementLabel } from '../src/ui/InstrumentView';
 import { interpretScore } from '../src/score/interpret';
-import { fixture } from './helpers';
+import { parseScore } from '../src/score/parser';
+import { chord, fixture, measure, synthetic, tempo, time } from './helpers';
 
 it('maps all 25 chromatic pitches to distinct bars and staggers accidentals between naturals', () => {
   const part = fixture('colonel-bogey').parts[0];
@@ -74,7 +75,10 @@ it('flags out-of-range notes without highlighting a different octave', () => {
 });
 
 it('uses a neutral strike without animated hand indicators for unspecified sticking', () => {
-  const score = fixture('colonel-bogey');
+  const score = parseScore(synthetic([
+    measure(time() + tempo(120)),
+    measure(chord('quarter', 38)),
+  ]), 'test');
   const part = score.parts[1];
   const note = interpretScore(score).movements.find(m => m.partId === part.id && !m.hand)!;
   const html = renderToStaticMarkup(createElement(InstrumentView, { part, active: [note], position: note.time }));
