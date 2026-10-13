@@ -21,7 +21,7 @@ describe('actual source scores', () => {
     expect(snare.every(n => !n.tremolo)).toBe(true);
     expect(snare.some((n, i) => i > 0 && n.hand === snare[i - 1].hand)).toBe(true);
   });
-  it('prefers visible Colonel Bogey metadata and resolves every drum note to Right stick', () => {
+  it('prefers visible Colonel Bogey metadata and resolves drum notes through the named stick mapping', () => {
     const score = fixture('colonel-bogey');
     expect(score.title).toBe('Colonel Bogey');
     expect(score.composer).toBe('Kenneth J. Alford');
@@ -31,7 +31,7 @@ describe('actual source scores', () => {
     const snare = score.notes.filter(n => n.partId === score.parts[1].id);
     expect(snare).toHaveLength(123);
     expect(snare.every(n => n.provenance === 'drum-map')).toBe(true);
-    expect(snare.every(n => n.hand === 'R' && n.pitch === 40)).toBe(true);
+    expect(snare.every(n => (n.pitch === 38 && n.hand === 'L') || (n.pitch === 40 && n.hand === 'R'))).toBe(true);
     expect(score.parts[1].drums).toMatchObject({
       38: { name: 'Left stick', hand: 'L', line: 1 },
       40: { name: 'Right stick', hand: 'R', line: -1 },

@@ -56,13 +56,14 @@ describe('drum challenge', () => {
     expect(attempt.finish()).toMatchObject({ perfect: 1, missed: 0, stars: 10 });
   });
 
-  it('keeps known and unknown hands from the real score, including repeats and roll skeletons', () => {
+  it('keeps named hands from the real score, including repeats and roll skeletons', () => {
     const timeline = interpretScore(fixture('colonel-bogey'));
     const part = playableDrums(timeline)[0];
     const targets = drumTargets(timeline, part, 1);
     const movements = timeline.movements.filter(m => m.partId === part.id);
     expect(targets).toHaveLength(movements.length);
-    expect(targets.some(t => t.hand === undefined)).toBe(true);
+    expect(targets.map(t => t.hand)).toEqual(movements.map(m => m.hand));
+    expect(targets.every(t => t.hand !== undefined)).toBe(true);
     expect(targets.some(t => t.hand === 'L')).toBe(true);
     expect(targets.some(t => t.hand === 'R')).toBe(true);
     const attempt = new Attempt(targets, 1);
