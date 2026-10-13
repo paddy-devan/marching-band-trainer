@@ -139,4 +139,52 @@ describe('audio-clock transport', () => {
     expect(vi.getTimerCount()).toBe(0);
     pending.transport.dispose();
   });
+  it('schedules a full count-in before the score, then clicks score beats on the same clock', async () => {
+    const { context, transport } = setup();
+    await transport.play({ countIn: true, metronome: true, outputTiming: true });
+    expect(transport.getSnapshot().position).toBe(-2);
+    expect(context.sources).toHaveLength(1);
+    expect(context.sources[0].frequency.calls[0].value).toBe(1400);
+    context.currentTime = 2.035;
+    vi.advanceTimersByTime(25);
+    expect(transport.readPosition()).toBeCloseTo(0);
+    expect(context.sources.some(s => s.frequency.calls[0]?.value === 1000)).toBe(false); // skipped clicks aren't replayed
+    expect(context.sources.filter(s => s.start.mock.calls[0][0] === 2.035)).toHaveLength(3); // two parts and downbeat
+    transport.dispose();
+  });
+  it('maps input event timestamps to output time independently of the 25ms UI snapshot', async () => {
+    const { context, transport } = setup();
+    await transport.play({ outputTiming: true });
+    context.currentTime = 1.5;
+    Object.assign(context, { getOutputTimestamp: () => ({ contextTime: 1, performanceTime: performance.now() }) });
+    expect(transport.getSnapshot().position).toBe(0);
+    expect(transport.readPosition(performance.now() - 20)).toBeCloseTo(0.945);
+    context.currentTime = 4.2;
+    vi.advanceTimersByTime(25);
+    expect(transport.getSnapshot().playing).toBe(true); // wait for the audible end
+    Object.assign(context, { getOutputTimestamp: () => ({ contextTime: 4.1, performanceTime: performance.now() }) });
+    vi.advanceTimersByTime(25);
+    expect(transport.getSnapshot().playing).toBe(false);
+    transport.dispose();
+  });
+  it('plays user strikes despite muted lyre backing, and cancels star sounds on exit', async () => {
+    const { context, transport, score } = setup();
+    const part = score.parts[0];
+    part.register.transpose = 24;
+    transport.setMix({ [part.id]: { muted: true, solo: false } });
+    await transport.play();
+    expect(context.gains[1].gain.value).toBe(0);
+    transport.strike(part.id, 84);
+    const manual = context.sources.at(-1)!;
+    expect(manual.frequency.calls[0].value).toBeCloseTo(440 * 2 ** ((84 - 69) / 12));
+    expect(context.gains.at(-1)!.connect).toHaveBeenCalledWith(context.gains[0]);
+    transport.pause();
+    const before = context.sources.length;
+    transport.revealStar(0);
+    transport.revealStar(1);
+    expect(context.sources.length).toBe(before + 4);
+    expect(context.sources[before + 2].frequency.calls[0].value).toBeGreaterThan(context.sources[before].frequency.calls[0].value);
+    transport.dispose();
+    expect(context.sources.every(s => s.stop.mock.calls.some(args => args.length === 0))).toBe(true);
+  });
 });
