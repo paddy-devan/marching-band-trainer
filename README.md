@@ -41,6 +41,14 @@ The preparation script enumerates `.mscz` files automatically, copies the origin
 
 `scores/` is canonical and belongs in Git. `public/generated/`, `node_modules/` and `dist/` are disposable and ignored. The three supplied files are preserved, including `hollyrood.mscz`, whose visible title is **Holyrood**.
 
+## Install as an app
+
+The header’s **Install as App** button installs **SLSCC Band** using the browser’s native prompt when available. Otherwise, it opens instructions for the browser, including Safari’s **Add to Home Screen** on iPhone/iPad and **Add to Dock** on Mac. Launcher icons use the same artwork as `public/favicon.svg`; the PNG versions are in `public/icons/`.
+
+The button hides in the installed app, after a confirmed installation, and when a supporting browser detects the installed PWA. Confirmed installations are remembered locally; a new native install prompt clears that marker after uninstalling. Browsers do not all expose installation status, so a manual installation can only be recognised after opening the installed app. Install prompts require HTTPS in production (localhost works for development).
+
+Production builds generate `sw.js`, which caches the app and bundled scores for offline practice after its first successful load. Each build has a content-based cache version. Updates wait until existing app windows close, so playback is not interrupted; pages and the score catalogue are requested from the network when available. The service worker is disabled in development. Check installation and offline behaviour with `npm run build` and `npm run preview`. The manifest, icons and worker also respect a configured Vite base path.
+
 ## Static deployment
 
 `npm run build` produces **`dist/`**, containing everything needed by a static HTTP host. Copy that directory to the host. No Node.js process is needed in production.

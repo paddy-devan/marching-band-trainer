@@ -4,6 +4,7 @@ import { Catalogue, type CatalogueItem } from './ui/Catalogue';
 import { Practice } from './ui/Practice';
 import { Challenge } from './ui/Challenge';
 import type { ChallengeMode } from './game/parts';
+import { InstallApp, useAppInstall } from './ui/InstallApp';
 
 function challengeFromHash(): ChallengeMode | undefined {
   if (window.location.hash.endsWith('/drum-challenge')) return 'drum';
@@ -18,6 +19,7 @@ function scoreIdFromHash() {
 }
 
 export default function App() {
+  const install = useAppInstall();
   const [items, setItems] = useState<CatalogueItem[]>([]);
   const [linkedScore, setLinkedScore] = useState(scoreIdFromHash);
   const [game, setGame] = useState(challengeFromHash);
@@ -65,7 +67,7 @@ export default function App() {
   const unknownScore = linkedScore !== undefined && !loading && !error && !selectedItem;
   if (timeline && game) return <Challenge key={`${timeline.score.id}:${game}`} timeline={timeline} mode={game} onExit={() => { window.location.hash = encodeURIComponent(timeline.score.id); }} />;
   return <>
-    <header className="app-header"><a href={import.meta.env.BASE_URL} className="brand" aria-label="SLSCC Band home"><span className="brand-mark" aria-hidden="true" /><span>SLSCC <strong>Band</strong></span></a></header>
+    <header className="app-header"><a href={import.meta.env.BASE_URL} className="brand" aria-label="SLSCC Band home"><span className="brand-mark" aria-hidden="true" /><span>SLSCC <strong>Band</strong></span></a><InstallApp {...install} /></header>
     <div className={`app-layout${linkedScore === undefined ? ' score-landing-layout' : ''}`}>
       {linkedScore === undefined ? <Catalogue landing items={items} onSelect={selectScore} query={query} onQuery={setQuery} loading={loading} error={error} /> : <>
       <Catalogue items={items} selected={selected} onSelect={selectScore} query={query} onQuery={setQuery} loading={loading} error={error} />
