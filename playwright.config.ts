@@ -2,11 +2,15 @@ import { defineConfig } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+const browserName = process.env.PLAYWRIGHT_BROWSER === 'firefox' ? 'firefox'
+  : process.env.PLAYWRIGHT_BROWSER === 'webkit' ? 'webkit' : 'chromium';
+
 export default defineConfig({
   testDir: './tests/e2e',
   outputDir: process.env.PLAYWRIGHT_OUTPUT_DIR || path.join(tmpdir(), 'marching-band-playwright-results'),
   fullyParallel: false,
-  use: { baseURL: process.env.E2E_URL || 'http://127.0.0.1:5173', channel: process.env.PLAYWRIGHT_CHANNEL || undefined },
+  use: { baseURL: process.env.E2E_URL || 'http://127.0.0.1:5173', browserName,
+    channel: browserName === 'chromium' ? process.env.PLAYWRIGHT_CHANNEL || undefined : undefined },
   webServer: process.env.E2E_URL ? undefined : {
     command: 'npm run dev -- --port 5173 --strictPort',
     url: 'http://127.0.0.1:5173', reuseExistingServer: !process.env.CI,
