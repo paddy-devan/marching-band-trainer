@@ -66,6 +66,16 @@ describe('bell lyre challenge scoring', () => {
     expect(attempt.tap(84, 1.04)).toBe('Extra tap');
     expect(attempt.finish()).toMatchObject({ perfect: 1, missed: 0, extras: 1 });
   });
+  it('accepts out-of-order queued chord inputs after expiry has advanced past later notes', () => {
+    const attempt = new Attempt([target(1, 84, 'c'), target(1, 88, 'e'), target(2, 86), target(3)], 1);
+    expect(attempt.advance(2.2)).toBe(3);
+    expect(attempt.tap(86, 2.03)).toBe('Perfect');
+    expect(attempt.tap(88, 1.02)).toBe('Perfect');
+    expect(attempt.tap(84, 1.01)).toBe('Perfect');
+    expect(attempt.advance(2.3)).toBe(0);
+    expect(attempt.tap(84, 3)).toBe('Perfect');
+    expect(attempt.finish()).toMatchObject({ stars: 10, perfect: 4, missed: 0, longestPerfectStreak: 4 });
+  });
   it('deduplicates unisons, preserves chords, and narrows windows between fast notes', () => {
     const timeline = interpretScore(parseScore(synthetic([measure(time() + tempo(120) + chord('16th') + chord('16th'))]), 'test'));
     const part = timeline.score.parts[0];

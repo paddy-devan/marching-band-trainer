@@ -4,7 +4,7 @@ import { countIn, metronomeClicks, type Click } from './beats';
 
 export type Mix = Record<string, { muted: boolean; solo: boolean; volume?: number }>;
 export type TransportState = { playing: boolean; position: number; speed: number; status?: string };
-export type PlayOptions = { countIn?: boolean; metronome?: boolean; outputTiming?: boolean };
+export type PlayOptions = { countIn?: boolean; metronome?: boolean; outputTiming?: boolean; skipMuted?: boolean };
 type Contact = { at: number; seconds: number; velocity: number; movement: Movement };
 type SoundSource = AudioScheduledSourceNode;
 
@@ -36,9 +36,12 @@ export class Transport {
   private clicks: Click[] = [];
   private nextClick = 0;
   private outputTiming = false;
+  private skipMuted = false;
+  private bassParts: Set<string>;
 
   constructor(readonly timeline: Timeline, private createContext = () => new AudioContext()) {
     this.parts = new Map(timeline.score.parts.map(p => [p.id, p]));
+    this.bassParts = new Set(timeline.score.parts.filter(p => /bass/i.test(p.name + p.instrument)).map(p => p.id));
     this.contacts = timeline.movements.flatMap(movement => audioContacts(movement).map(c => ({ at: c.time, seconds: c.seconds, velocity: c.velocity, movement }))).sort((a, b) => a.at - b.at);
   }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
@@ -91,6 +94,9 @@ export class Transport {
       }
     });
     this.updateGains();
+    // Prepare the shared snare noise before play so the first live strike does
+    // not have to allocate and fill a buffer on the input path.
+    if ([...this.parts.values()].some(p => p.percussion && !this.bassParts.has(p.id))) this.prepareNoise();
   }
   async play(options: PlayOptions = {}) {
     if (this.disposed || this.state.playing || this.starting) return;
@@ -102,6 +108,9 @@ export class Transport {
       if (request !== this.revision || this.disposed) return;
       if (this.context!.state !== 'running') throw new Error('Audio is suspended. Press Play again to resume.');
       this.outputTiming = options.outputTiming ?? false;
+      // Challenge mixes are fixed until Stop. Practice keeps muted sources so
+      // unmuting a held or already-scheduled note still works immediately.
+      this.skipMuted = options.skipMuted ?? false;
       const leadIn = options.countIn ? countIn(this.timeline) : undefined;
       this.clicks = options.metronome ? metronomeClicks(this.timeline) : [];
       if (leadIn) this.clicks.unshift(...Array.from({ length: leadIn.beats }, (_, beat) => ({ time: -leadIn.duration + beat * leadIn.interval, accent: beat === 0 })));
@@ -231,6 +240,7 @@ export class Transport {
     const ctx = this.context!;
     const part = this.parts.get(contact.movement.partId)!;
     const bus = this.buses.get(part.id)!;
+    if (this.skipMuted && !output && bus.gain.value === 0) return;
     const length = Math.max(0.02, Math.min(contact.seconds / this.state.speed, 2));
     const gain = ctx.createGain();
     gain.connect(output || bus);
@@ -240,7 +250,7 @@ export class Transport {
     const decay = contact.movement.percussion ? Math.min(length, 0.16) : lyre ? Math.min(2.5, length * 1.2 + 0.06) : length;
     if (lyre) gain.gain.exponentialRampToValueAtTime(contact.velocity * 0.055, when + Math.min(0.3, length * 0.5));
     gain.gain.exponentialRampToValueAtTime(0.0001, when + decay);
-    if (!contact.movement.percussion || /bass/i.test(part.name + part.instrument)) {
+    if (!contact.movement.percussion || this.bassParts.has(part.id)) {
       const osc = ctx.createOscillator();
       osc.type = contact.movement.percussion ? 'sine' : 'triangle';
       const frequency = contact.movement.percussion ? 95 : 440 * 2 ** ((contact.movement.pitch + part.register.transpose - 69) / 12);
@@ -251,13 +261,9 @@ export class Transport {
       osc.start(when);
       osc.stop(when + decay + 0.01);
     } else {
-      if (!this.noise) {
-        this.noise = ctx.createBuffer(1, ctx.sampleRate * 0.3, ctx.sampleRate);
-        const data = this.noise.getChannelData(0);
-        for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-      }
+      this.prepareNoise();
       const noise = ctx.createBufferSource();
-      noise.buffer = this.noise;
+      noise.buffer = this.noise!;
       const filter = ctx.createBiquadFilter();
       filter.type = 'highpass'; filter.frequency.value = 1200;
       noise.connect(filter); filter.connect(gain);
@@ -265,6 +271,13 @@ export class Transport {
       noise.start(when);
       noise.stop(when + decay + 0.01);
     }
+  }
+  private prepareNoise() {
+    if (this.noise) return;
+    const ctx = this.context!;
+    this.noise = ctx.createBuffer(1, ctx.sampleRate * 0.3, ctx.sampleRate);
+    const data = this.noise.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
   }
   dispose() {
     this.pause();

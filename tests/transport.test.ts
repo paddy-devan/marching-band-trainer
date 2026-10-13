@@ -243,4 +243,28 @@ describe('audio-clock transport', () => {
     transport.dispose();
     expect(tap.stop).toHaveBeenCalledWith();
   });
+  it('skips muted challenge sources while retaining live taps, count-in and audible accompaniment', async () => {
+    const { context, transport, score } = setup();
+    const part = score.parts[0];
+    transport.setMix({ [part.id]: { muted: true, solo: false } });
+    await transport.play({ countIn: true, skipMuted: true });
+    expect(context.sources).toHaveLength(1); // Count-in remains audible.
+    context.currentTime = 2.035;
+    vi.advanceTimersByTime(25);
+    expect(context.sources).toHaveLength(2); // Only the unmuted part is scheduled.
+    transport.strike(part.id, 60);
+    expect(context.sources).toHaveLength(3);
+    expect(context.gains.at(-1)!.connect).toHaveBeenCalledWith(context.gains[0]);
+    transport.dispose();
+  });
+  it('keeps muted practice sources available for immediate unmuting of held notes', async () => {
+    const { context, transport, score } = setup();
+    transport.setMix({ [score.parts[0].id]: { muted: true, solo: false } });
+    await transport.play();
+    expect(context.sources).toHaveLength(2);
+    transport.setMix({ [score.parts[0].id]: { muted: false, solo: false } });
+    expect(context.gains[1].gain.value).toBe(1);
+    expect(context.sources).toHaveLength(2);
+    transport.dispose();
+  });
 });

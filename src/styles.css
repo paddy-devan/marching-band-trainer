@@ -194,6 +194,7 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
 @keyframes perfect-pop { from { opacity: .4; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
 .game-board { position: relative; flex: 1; min-height: 0; width: 100%; max-width: 520px; margin: 0 auto; background: #dbe7ec; border-radius: 12px; border: 6px solid #dbe7ec; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .game-bar { position: absolute; min-height: 0; width: calc(50% - 3px); display: flex; align-items: center; justify-content: space-between; border: 2px solid #dbe7ec; border-radius: 6px; padding: 0 12px; background: #fff; color: #354a56; font-size: clamp(13px, 2dvh, 20px); font-weight: 650; touch-action: none; box-shadow: inset 0 -2px 0 #253e4b0c; }
+.game-bar, .drum-pad { transition: none; }
 .game-bar.natural { right: 0; }.game-bar.accidental { left: 0; background: #eaf1f4; }
 .game-bar sub { font-size: .68em; color: #728792; margin-left: 3px; }.game-bar.accidental > span:first-child { margin-left: auto; }
 .game-bar.accidental .game-bar-dot { order: -1; }
@@ -240,6 +241,7 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
 .drum-cue-bar.right { left: 55%; width: 40%; }
 .drum-cue-bar.either { left: 5%; width: 90%; }
 .drum-note { border: 1px solid #087c95; background: #0787a2; color: #fff; box-shadow: 0 3px 8px #233d4e12; }
+.drum-note { top: 0; will-change: transform; }
 .drum-note.right { background: #7950b4; border-color: #68409f; }
 .drum-note.either { background: #fff; color: #354a56; border: 2px dashed #8b9da8; }
 .drum-hit-target { top: 100%; border: 2px solid #0787a2; color: #0787a2; pointer-events: none; }

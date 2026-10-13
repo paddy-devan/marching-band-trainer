@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Transport, type Mix } from '../audio/transport';
 import { countIn } from '../audio/beats';
 import { Attempt, drumTargets, gameTargets, type Result, type Strike } from '../game/scoring';
 import type { Timeline } from '../score/model';
-import { positionAt } from '../score/interpret';
-import { value, add } from '../score/fraction';
 import { playableDrums, playableLyres, type ChallengeMode } from '../game/parts';
 import { LyreBoard } from './LyreBoard';
-import { DrumBoard } from './DrumBoard';
+import { DrumBoard, type DrumAnimation } from './DrumBoard';
+import { ChallengeFrames } from './challenge-frame';
 import type { Feedback } from './game-types';
 
 type Settings = { speed: number; preview: boolean; metronome: boolean; backing: boolean };
@@ -63,18 +62,33 @@ export function Challenge({ timeline, mode, onExit }: { timeline: Timeline; mode
   const [settings, setSettings] = useState<Settings>({ speed: 0.75, preview: true, metronome: false, backing: false });
   const [phase, setPhase] = useState<Phase>('setup');
   const phaseRef = useRef<Phase>('setup');
-  const [position, setPosition] = useState(0);
+  const position = useRef(0);
+  const progress = useRef<HTMLProgressElement>(null);
+  const drumAnimation = useRef<DrumAnimation>(null);
+  const attachProgress = useCallback((node: HTMLProgressElement | null) => {
+    progress.current = node;
+    if (node) node.value = Math.max(0, position.current);
+  }, []);
   const [result, setResult] = useState<Result>();
   const [message, setMessage] = useState('');
-  const [feedback, setFeedback] = useState<Feedback>({ text: '', at: -Infinity });
+  const feedback = useRef<Feedback | undefined>(undefined);
   const attempt = useRef<Attempt | undefined>(undefined);
   const request = useRef(0);
   const started = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const targets = useMemo(() => part ? (drum ? drumTargets : gameTargets)(timeline, part, settings.speed) : [], [timeline, part, settings.speed, drum]);
   const leadIn = useMemo(() => countIn(timeline), [timeline]);
-  const beats = positionAt(timeline.score, Math.max(0, position));
-  const measure = timeline.score.measures.find(m => beats >= value(m.start) && beats < value(add(m.start, m.duration))) || timeline.score.measures.at(-1)!;
+  const frames = useMemo(() => new ChallengeFrames(timeline, targets, settings.speed, drum, settings.preview), [timeline, targets, settings.speed, drum, settings.preview]);
+  const [view, setView] = useState(() => frames.read(0));
+  const published = useRef(view);
+  const publish = useCallback((at: number) => {
+    const next = frames.read(at, attempt.current, feedback.current);
+    if (next !== published.current) { published.current = next; setView(next); }
+  }, [frames]);
+  const drumPitches = useMemo(() => ({
+    L: targets.find(t => t.hand === 'L')?.pitch ?? targets[0]?.pitch,
+    R: targets.find(t => t.hand === 'R')?.pitch ?? targets[0]?.pitch,
+  }), [targets]);
   useEffect(() => { if (phase === 'setup') heading.current?.focus(); }, [phase]);
 
   const changePhase = (next: Phase) => { phaseRef.current = next; setPhase(next); };
@@ -84,8 +98,8 @@ export function Challenge({ timeline, mode, onExit }: { timeline: Timeline; mode
     transport.pause();
     transport.restart();
     attempt.current = undefined;
-    setPosition(0);
-    setFeedback({ text: '', at: -Infinity });
+    position.current = 0;
+    feedback.current = undefined;
     setMessage(reason);
     changePhase('setup');
   };
@@ -96,13 +110,23 @@ export function Challenge({ timeline, mode, onExit }: { timeline: Timeline; mode
   useEffect(() => {
     if (phase !== 'running') return;
     let frame = 0;
+    let lastProgress = -Infinity;
     const update = () => {
       if (phaseRef.current !== 'running') return;
       if (started.current) {
         const state = transport.getSnapshot();
         const at = transport.readPosition();
-        setPosition(at);
+        position.current = at;
         if (at >= 0) attempt.current?.advance(at);
+        drumAnimation.current?.update(at);
+        // Progress is informational; it need not trigger layout on every frame.
+        const now = performance.now();
+        if (progress.current && now - lastProgress >= 100) {
+          const value = Math.max(0, at);
+          if (progress.current.value !== value) progress.current.value = value;
+          lastProgress = now;
+        }
+        publish(at);
         if (!state.playing) {
           if (state.position >= timeline.duration && attempt.current) {
             setResult(attempt.current.finish());
@@ -118,14 +142,14 @@ export function Challenge({ timeline, mode, onExit }: { timeline: Timeline; mode
     document.addEventListener('visibilitychange', interrupt);
     return () => { cancelAnimationFrame(frame); document.removeEventListener('visibilitychange', interrupt); };
   // Settings cannot change during an attempt; the transport and timeline are stable.
-  }, [phase, transport, timeline]);
+  }, [phase, transport, timeline, publish]);
 
   const start = async () => {
     if (!part || phaseRef.current !== 'setup') return;
     const revision = ++request.current;
     setMessage('');
     setResult(undefined);
-    setFeedback({ text: '', at: -Infinity });
+    feedback.current = undefined;
     attempt.current = new Attempt(targets, settings.speed);
     const mix: Mix = Object.fromEntries(timeline.score.parts.map(p => [p.id, {
       muted: p.id === part.id ? !settings.backing : drum ? false : !p.percussion, solo: false, volume: p.id === part.id ? 0.45 : 1,
@@ -134,33 +158,30 @@ export function Challenge({ timeline, mode, onExit }: { timeline: Timeline; mode
     transport.restart();
     transport.setSpeed(settings.speed);
     transport.setMix(mix);
-    setPosition(-leadIn.duration);
+    position.current = -leadIn.duration;
+    publish(position.current);
     changePhase('running');
-    await transport.play({ countIn: true, metronome: settings.metronome, outputTiming: true });
+    await transport.play({ countIn: true, metronome: settings.metronome, outputTiming: true, skipMuted: true });
     if (request.current !== revision) return;
     if (!transport.getSnapshot().playing) { stop(transport.getSnapshot().status || 'Audio could not start. Please try again.'); return; }
     started.current = true;
   };
-  const tap = (strike: Strike, timestamp: number) => {
+  const tap = useCallback((strike: Strike, timestamp: number) => {
     if (phaseRef.current !== 'running' || !started.current || !part || !transport.getSnapshot().playing) return;
     const at = transport.readPosition(timestamp);
-    const pitch = typeof strike === 'number' ? strike : targets.find(t => t.hand === strike)?.pitch ?? targets[0].pitch;
+    const pitch = typeof strike === 'number' ? strike : drumPitches[strike];
+    if (pitch === undefined) return;
     transport.strike(part.id, pitch);
     // Count-in taps are free. Clock conversion can put an exact first attack a
     // fraction of a nanosecond below zero; treat that as the score boundary.
-    if (at < -1e-8) { setFeedback({ strike, text: '', at }); return; }
-    const text = attempt.current!.tap(strike, Math.max(0, at));
-    setFeedback({ strike, text, at });
-  };
+    const text = at < -1e-8 ? '' : attempt.current!.tap(strike, Math.max(0, at));
+    feedback.current = { strike, text, at };
+    publish(position.current);
+  }, [transport, part, drumPitches, publish]);
 
   if (!part) return <main className="challenge"><div className="game-card"><h1>{title} unavailable</h1><p>{drum ? 'This piece needs a side or snare drum part with playable notes.' : 'This piece needs a bell lyre part with notes inside its playable range.'}</p><button onClick={onExit}>Back to score</button></div></main>;
-  const next = targets.find(t => t.time >= position - 0.001 && !attempt.current?.isJudged(t.id));
-  const cuePitches = new Set(!drum && settings.preview && next && (next.time - position) / settings.speed <= 0.8
-    ? targets.filter(t => t.time === next.time && !attempt.current?.isJudged(t.id)).map(t => t.pitch) : []);
-  const visibleFeedback = (position - feedback.at) / settings.speed < 0.4 ? feedback : undefined;
-  const perfectStreak = attempt.current?.perfectStreak().current ?? 0;
+  const { cuePitches, feedback: visibleFeedback, perfectStreak, count } = view;
   const streakTier = perfectStreak >= 30 ? 'spark' : perfectStreak >= 20 ? 'glow' : perfectStreak >= 10 ? 'bright' : 'calm';
-  const count = position < 0 ? Math.min(leadIn.beats, Math.floor((position + leadIn.duration) / leadIn.interval) + 1) : 0;
   return <main className={`challenge game-${mode} game-${phase}`}>
     <header className="game-header"><button onClick={() => { stop(); onExit(); }} aria-label="Back to score">← <span>Score</span></button><div><span className="game-eyebrow">{title}</span><h1 ref={heading} tabIndex={-1}>{timeline.score.title}</h1></div>{phase === 'running' ? <button onClick={() => stop()}>Stop</button> : <span className="game-header-star" aria-hidden="true">✦</span>}</header>
     {phase === 'setup' ? <section className="game-card game-setup" aria-labelledby="game-setup-title">
@@ -179,17 +200,17 @@ export function Challenge({ timeline, mode, onExit }: { timeline: Timeline; mode
       {message ? <p className="game-message" role="status">{message}</p> : null}
       <button className="game-primary game-start" onClick={() => void start()}>Start attempt <span aria-hidden="true">→</span></button>
     </section> : phase === 'results' && result ? <GameResult result={result} backingLabel={backingLabel} settings={settings} transport={transport} onRetry={() => stop()} onExit={onExit} /> : <>
-      <div className="game-progress"><progress aria-label="Piece progress" max={timeline.duration} value={Math.max(0, position)} /><span>{Math.round(settings.speed * 100)}% · {position < 0 ? 'Count-in' : `Bar ${(measure.sourceIndex ?? measure.index) + 1}`}</span></div>
+      <div className="game-progress"><progress ref={attachProgress} aria-label="Piece progress" max={timeline.duration} /><span>{Math.round(settings.speed * 100)}% · {count > 0 ? 'Count-in' : `Bar ${view.bar}`}</span></div>
       <div className="game-playing-status" aria-live="off">
-        {position < 0 ? <span className="game-count-in">Count in {count} / {leadIn.beats}</span> : <>
-          <span className="game-perfect-slot">{visibleFeedback?.text && (drum || visibleFeedback.text === 'Perfect') ? <span className={visibleFeedback.text === 'Perfect' ? 'game-perfect' : 'game-judgement'} key={feedback.at}>{visibleFeedback.text === 'Perfect' ? 'Perfect!' : visibleFeedback.text}</span> : null}</span>
+        {count > 0 ? <span className="game-count-in">Count in {count} / {leadIn.beats}</span> : <>
+          <span className="game-perfect-slot">{visibleFeedback?.text && (drum || visibleFeedback.text === 'Perfect') ? <span className={visibleFeedback.text === 'Perfect' ? 'game-perfect' : 'game-judgement'} key={visibleFeedback.at}>{visibleFeedback.text === 'Perfect' ? 'Perfect!' : visibleFeedback.text}</span> : null}</span>
           {perfectStreak >= 3 ? <span className={`game-perfect-streak streak-${streakTier}`}>
             <span className="game-streak-spark" aria-hidden="true">✦</span>
             <span>Perfect streak ·</span><strong className="game-streak-count">{perfectStreak}</strong>
           </span> : null}
         </>}
       </div>
-      {drum ? <DrumBoard targets={targets} position={position} speed={settings.speed} preview={settings.preview} attempt={attempt.current} feedback={visibleFeedback} onTap={tap} />
+      {drum ? <DrumBoard upcoming={view.upcoming} eitherHand={view.eitherHand} position={position.current} speed={settings.speed} preview={settings.preview} animationRef={drumAnimation} feedback={visibleFeedback} onTap={tap} />
         : <LyreBoard part={part} cuePitches={cuePitches} feedback={visibleFeedback} onTap={tap} />}
     </>}
   </main>;

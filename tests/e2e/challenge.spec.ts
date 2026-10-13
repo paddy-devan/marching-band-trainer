@@ -115,6 +115,8 @@ test('a completed attempt reveals ten integer stars one by one with sounds and r
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./#colonel-bogey/challenge');
   await page.getByRole('button', { name: '100%', exact: true }).click();
+  // Muted backing no longer generates sources. Enable it for the observed clock.
+  await page.getByLabel('Bell lyre backing').check();
   await page.getByRole('button', { name: 'Start attempt' }).click();
   await expect(page.getByRole('button', { name: 'Play C6', exact: true })).toHaveClass(/cued/);
   await expect(page.locator('.game-count-in')).toHaveText('Count in 2 / 3'); // cues now precede the old half-second window
@@ -188,6 +190,7 @@ test('streak tiers build gently while the counter stays anchored as alerts and d
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto('./#colonel-bogey/challenge');
   await page.getByRole('button', { name: '100%', exact: true }).click();
+  await page.getByLabel('Bell lyre backing').check();
   await page.getByRole('button', { name: 'Start attempt' }).click();
   const counter = page.locator('.game-streak-count');
   const badge = page.locator('.game-perfect-streak');

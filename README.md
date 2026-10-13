@@ -118,6 +118,8 @@ The result is an **integer number of stars out of ten**: weighted hit credit, le
 
 Results exist only in memory and are cleared when retrying, leaving, or reloading. Stop returns to setup with the chosen settings. Backgrounding the page or losing audio interrupts the attempt and offers a fresh start without awarding a partial score. Parts containing notes outside their configured lyre register do not offer the challenge.
 
+Challenge animation reads the audio clock without rerendering the screen each frame. React updates only when cues, feedback, count-in, the displayed bar or streak change; drum notes move using transforms with cached, resize-aware geometry. Progress updates ten times per second. Target lookups use an onset index, and missed-note expiry advances through each target once while preserving credit for delayed input timestamps. Tap colours change immediately. Fixed challenge mixes skip muted audio synthesis; practice still schedules muted notes so unmuting a held note remains immediate. Shared snare noise is prepared before playback rather than on the first tap.
+
 Unit checks cover scoring, chords, duplicate unisons, ties, repeat passes, speed, count-in, compound meter, and audio timing/cancellation. Browser checks cover entry/settings, touch input, responsive bounds, history, interruptions, ten sequential star reveals with scheduled sounds, zero-star attempts, retry, streak tiers and stable counter placement, and reduced motion. Real iOS/Android touch feel and audio latency still need device verification.
 
 ## Drum challenge

@@ -1,4 +1,5 @@
 import type { Hand, Part, Timeline } from '../score/model';
+import { TargetIndex } from './target-index';
 
 export type Target = { id: string; time: number; pitch: number; window: number; kind?: 'drum'; hand?: Hand };
 export type Strike = number | Hand;
@@ -52,12 +53,16 @@ export class Attempt {
   private eventOrder = 0;
   private streakDirty = false;
   private streak = { current: 0, longest: 0 };
-  constructor(readonly targets: Target[], readonly speed: number) {}
+  private nextExpiry = 0;
+  private index: TargetIndex;
+  constructor(readonly targets: Target[], readonly speed: number) { this.index = new TargetIndex(targets); }
 
   advance(position: number) {
     let missed = 0;
-    for (const target of this.targets) {
+    while (this.nextExpiry < this.targets.length) {
+      const target = this.targets[this.nextExpiry];
       if (target.time + target.window * this.speed >= position) break;
+      this.nextExpiry++;
       if (!this.judged.has(target.id)) { this.judged.set(target.id, 0); this.streakDirty = true; missed++; }
     }
     return missed;
@@ -67,7 +72,13 @@ export class Attempt {
     this.advance(position);
     // A queued input can arrive after a render frame has expired the note. Its
     // original event timestamp still earns credit; successful hits stay claimed.
-    const available = this.targets.filter(t => !this.wrongHands.has(t.id) && (this.judged.get(t.id) ?? 0) === 0 && Math.abs(position - t.time) / this.speed <= t.window + 1e-8);
+    const available: Target[] = [];
+    const radius = (this.index.maxWindow + 1e-8) * this.speed;
+    for (let i = this.index.lowerBound(position - radius); i < this.targets.length; i++) {
+      const t = this.targets[i];
+      if (t.time > position + radius) break;
+      if (!this.wrongHands.has(t.id) && (this.judged.get(t.id) ?? 0) === 0 && Math.abs(position - t.time) / this.speed <= t.window + 1e-8) available.push(t);
+    }
     const target = available.filter(t => t.kind === 'drum'
       ? typeof strike === 'string' && (!t.hand || t.hand === strike)
       : t.pitch === strike).sort((a, b) => Math.abs(position - a.time) - Math.abs(position - b.time)

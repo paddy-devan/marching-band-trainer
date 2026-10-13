@@ -69,8 +69,8 @@ test('drum entry, shared settings, falling lanes, responsive pads, stop and hist
   await expect(page.locator('.drum-pad')).toHaveCount(2);
   await expect(page.locator('.drum-note').first()).toBeVisible();
   const falling = page.locator('.drum-note').first();
-  const before = await falling.evaluate(el => parseFloat((el as HTMLElement).style.top));
-  await expect.poll(() => falling.evaluate(el => parseFloat((el as HTMLElement).style.top))).toBeGreaterThan(before);
+  const before = await falling.evaluate(el => el.getBoundingClientRect().top);
+  await expect.poll(() => falling.evaluate(el => el.getBoundingClientRect().top)).toBeGreaterThan(before);
   for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 1440, height: 1000 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
     await expect(page.locator('.game-header')).toHaveCount(1);
@@ -105,6 +105,8 @@ test('either-hand cues are single spanning bars and a perfect attempt shares lyr
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./#16obr/drum-challenge');
   await page.getByRole('button', { name: '100%', exact: true }).click();
+  // Observe audible backing attacks to anchor injected event timestamps.
+  await page.getByLabel('Drum backing').check();
   await page.getByRole('button', { name: 'Start attempt' }).click();
   await expect(page.locator('.drum-note.left')).toBeVisible();
   await expect(page.locator('.drum-note.right')).toBeVisible();
@@ -120,7 +122,7 @@ test('either-hand cues are single spanning bars and a perfect attempt shares lyr
   await expect(page.locator('.game-result-score')).toHaveText('10 / 10', { timeout: 4000 });
   await expect(page.locator('.game-result-stats')).toHaveText('Perfect4Early / late0Missed0Extra / wrong0');
   await expect(page.locator('.game-best-streak')).toHaveText('Longest perfect streak4');
-  await expect(page.locator('.game-aids')).toContainText('Drum backing off');
+  await expect(page.locator('.game-aids')).toContainText('Drum backing on');
   const taps = await page.evaluate(() => (window as unknown as { drumAudio: { strikes: { scheduled: boolean }[] } }).drumAudio.strikes.filter(s => !s.scheduled).length);
   expect(taps).toBe(4);
   await page.screenshot({ path: path.join(tmpdir(), 'marching-band-drum-result.png'), fullPage: true });
@@ -134,6 +136,7 @@ test('cues off gives no prompts while wrong hands miss, either hands score, and 
   await shortDrumScore(page);
   await page.goto('./#16obr/drum-challenge');
   await page.getByRole('button', { name: '100%', exact: true }).click();
+  await page.getByLabel('Drum backing').check();
   await page.getByLabel('Advance note cues').uncheck();
   await page.getByRole('button', { name: 'Start attempt' }).click();
   await expect(page.locator('.drum-note')).toHaveCount(0);
@@ -183,6 +186,7 @@ test('simultaneous touch strikes score both hands while count-in taps and held k
   await shortDrumScore(page, xml);
   await page.goto('./#16obr/drum-challenge');
   await page.getByRole('button', { name: '100%', exact: true }).click();
+  await page.getByLabel('Drum backing').check();
   await page.getByRole('button', { name: 'Start attempt' }).click();
   await expect(page.locator('.game-count-in')).toBeVisible();
   await page.keyboard.press('f');
@@ -200,6 +204,7 @@ test('falling bars exactly overlap their outlines at the scored onset across scr
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./#16obr/drum-challenge');
   await page.getByRole('button', { name: '100%', exact: true }).click();
+  await page.getByLabel('Drum backing').check();
   await page.getByRole('button', { name: 'Start attempt' }).click();
 
   for (const index of [0, 2]) {
@@ -237,6 +242,21 @@ test('falling bars exactly overlap their outlines at the scored onset across scr
     await page.screenshot({ path: path.join(tmpdir(), `marching-band-drum-hit-${index === 0 ? 'left' : 'either'}.png`) });
   }
   await page.getByRole('button', { name: 'Stop', exact: true }).click();
+});
+
+test('default muted backing generates no drum sources while live taps respond immediately', async ({ page }) => {
+  await shortDrumScore(page);
+  await page.goto('./#16obr/drum-challenge');
+  await page.getByRole('button', { name: '100%', exact: true }).click();
+  await expect(page.getByLabel('Drum backing')).not.toBeChecked();
+  await page.getByRole('button', { name: 'Start attempt' }).click();
+  await expect(page.locator('.game-count-in')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { drumAudio: { strikes: unknown[] } }).drumAudio.strikes.length)).toBe(0);
+  await page.getByRole('button', { name: 'Play left stick' }).dispatchEvent('pointerdown', { pointerType: 'touch', button: 0 });
+  // Automation may land outside a hit window; both judgements give feedback.
+  await expect(page.locator('[data-hand="L"]')).toHaveClass(/\b(tapped|wrong)\b/);
+  expect(await page.locator('[data-hand="L"]').evaluate(el => getComputedStyle(el).transitionDuration)).toBe('0s');
+  expect(await page.evaluate(() => (window as unknown as { drumAudio: { strikes: { scheduled: boolean }[] } }).drumAudio.strikes)).toEqual([{ when: expect.any(Number), scheduled: false }]);
 });
 
 test.describe('mobile audio clock', () => {
