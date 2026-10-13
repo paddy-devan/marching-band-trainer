@@ -1,7 +1,8 @@
-import type { Part, Timeline } from '../score/model';
+import type { Hand, Part, Timeline } from '../score/model';
 
-export type Target = { id: string; time: number; pitch: number; window: number };
-export type Judgement = 'Perfect' | 'Early' | 'Late' | 'Wrong note' | 'Extra tap';
+export type Target = { id: string; time: number; pitch: number; window: number; kind?: 'drum'; hand?: Hand };
+export type Strike = number | Hand;
+export type Judgement = 'Perfect' | 'Early' | 'Late' | 'Wrong note' | 'Wrong hand' | 'Extra tap';
 export type Result = { stars: number; perfect: number; close: number; missed: number; extras: number; total: number; longestPerfectStreak: number };
 
 // Movements already contain expanded repeats and joined ties. Duplicate voices
@@ -14,6 +15,25 @@ export function gameTargets(timeline: Timeline, part: Part, speed: number): Targ
     unique.set(`${movement.time}:${pitch}`, { id: movement.id, time: movement.time, pitch, window: 0.15 });
   }
   const targets = [...unique.values()].sort((a, b) => a.time - b.time || a.pitch - b.pitch);
+  return withTimingWindows(targets, speed);
+}
+
+// Score the instructional roll movements, not the doubled audio contacts.
+// Duplicate voices needing the same hand/onset take one physical strike.
+export function drumTargets(timeline: Timeline, part: Part, speed: number): Target[] {
+  const unique = new Map<string, Target>();
+  for (const movement of timeline.movements) {
+    if (movement.partId !== part.id || !movement.percussion) continue;
+    const key = `${movement.time}:${movement.hand ?? 'either'}`;
+    if (!unique.has(key)) unique.set(key, {
+      id: movement.id, time: movement.time, pitch: movement.pitch, window: 0.15,
+      kind: 'drum', hand: movement.hand,
+    });
+  }
+  return withTimingWindows([...unique.values()].sort((a, b) => a.time - b.time), speed);
+}
+
+function withTimingWindows(targets: Target[], speed: number): Target[] {
   const onsets = [...new Set(targets.map(t => t.time))];
   const windows = new Map(onsets.map((time, index) => [time, Math.min(0.15,
     index > 0 ? (time - onsets[index - 1]) / speed / 2 : Infinity,
@@ -25,6 +45,7 @@ export function gameTargets(timeline: Timeline, part: Part, speed: number): Targ
 
 export class Attempt {
   private judged = new Map<string, number>();
+  private wrongHands = new Set<string>();
   private extras = 0;
   private hitEvents = new Map<string, { time: number; order: number }>();
   private extraEvents: { time: number; order: number }[] = [];
@@ -42,13 +63,28 @@ export class Attempt {
     return missed;
   }
 
-  tap(pitch: number, position: number): Judgement {
+  tap(strike: Strike, position: number): Judgement {
     this.advance(position);
     // A queued input can arrive after a render frame has expired the note. Its
     // original event timestamp still earns credit; successful hits stay claimed.
-    const available = this.targets.filter(t => (this.judged.get(t.id) ?? 0) === 0 && Math.abs(position - t.time) / this.speed <= t.window + 1e-8);
-    const target = available.filter(t => t.pitch === pitch).sort((a, b) => Math.abs(position - a.time) - Math.abs(position - b.time))[0];
+    const available = this.targets.filter(t => !this.wrongHands.has(t.id) && (this.judged.get(t.id) ?? 0) === 0 && Math.abs(position - t.time) / this.speed <= t.window + 1e-8);
+    const target = available.filter(t => t.kind === 'drum'
+      ? typeof strike === 'string' && (!t.hand || t.hand === strike)
+      : t.pitch === strike).sort((a, b) => Math.abs(position - a.time) - Math.abs(position - b.time)
+        || Number(!a.hand) - Number(!b.hand))[0];
     if (!target) {
+      const wrongHand = typeof strike === 'string'
+        ? available.filter(t => t.kind === 'drum').sort((a, b) => Math.abs(position - a.time) - Math.abs(position - b.time))[0]
+        : undefined;
+      if (wrongHand) {
+        // A wrong hand consumes the target as a miss, with no extra-tap penalty.
+        // Unlike a provisional expired miss, it cannot later be corrected.
+        this.judged.set(wrongHand.id, 0);
+        this.wrongHands.add(wrongHand.id);
+        this.hitEvents.set(wrongHand.id, { time: position, order: this.eventOrder++ });
+        this.streakDirty = true;
+        return 'Wrong hand';
+      }
       this.extras++;
       this.extraEvents.push({ time: position, order: this.eventOrder++ });
       this.streakDirty = true;

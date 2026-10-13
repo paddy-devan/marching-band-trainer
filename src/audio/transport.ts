@@ -203,8 +203,8 @@ export class Transport {
     if (!part || !this.context || this.context.state !== 'running' || this.disposed) return;
     const movement: Movement = {
       id: 'tap', partId, position: { n: 0, d: 1 }, duration: { n: 1, d: 1 },
-      time: 0, seconds: 0.35 * this.state.speed, pitch: soundingPitch - part.register.transpose,
-      percussion: false, provenance: 'unknown', roll: false, velocity: 0.8, sourceIds: [], sourceId: 'tap',
+      time: 0, seconds: 0.35 * this.state.speed, pitch: part.percussion ? soundingPitch : soundingPitch - part.register.transpose,
+      percussion: part.percussion, provenance: 'unknown', roll: false, velocity: 0.8, sourceIds: [], sourceId: 'tap',
     };
     this.sound({ at: 0, seconds: movement.seconds, velocity: movement.velocity, movement }, this.context.currentTime, this.master);
   }

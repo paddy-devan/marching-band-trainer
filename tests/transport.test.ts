@@ -187,4 +187,18 @@ describe('audio-clock transport', () => {
     transport.dispose();
     expect(context.sources.every(s => s.stop.mock.calls.some(args => args.length === 0))).toBe(true);
   });
+  it('plays live drum taps as short noise bursts through the master despite muted backing', async () => {
+    const { context, transport, score } = setup();
+    const drum = score.parts[1];
+    transport.setMix({ [drum.id]: { muted: true, solo: false } });
+    await transport.play();
+    transport.strike(drum.id, 38);
+    const tap = context.sources.at(-1)!;
+    expect(tap.buffer).toBeDefined();
+    expect(tap.frequency.calls).toHaveLength(0);
+    expect(tap.stop.mock.calls[0][0] - tap.start.mock.calls[0][0]).toBeCloseTo(0.17);
+    expect(context.gains.at(-1)!.connect).toHaveBeenCalledWith(context.gains[0]);
+    transport.dispose();
+    expect(tap.stop).toHaveBeenCalledWith();
+  });
 });

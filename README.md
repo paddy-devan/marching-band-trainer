@@ -118,6 +118,16 @@ Results exist only in memory and are cleared when retrying, leaving, or reloadin
 
 Unit checks cover scoring, chords, duplicate unisons, ties, repeat passes, speed, count-in, compound meter, and audio timing/cancellation. Browser checks cover entry/settings, touch input, responsive bounds, history, interruptions, ten sequential star reveals with scheduled sounds, zero-star attempts, retry, streak tiers and stable counter placement, and reduced motion. Real iOS/Android touch feel and audio latency still need device verification.
 
+## Drum challenge
+
+Choose **Drum challenge** on a score with a side/snare drum part, or open a direct link such as `#16obr/drum-challenge`. Drum and bell lyre challenges share the setup, count-in, progress, streaks, results, retry and interruption handling. Drum defaults are 75% speed, cues on, and metronome/drum backing off. Other parts play as accompaniment; the selected drum part only plays automatically when Drum backing is enabled. Every player tap sounds a short snare strike independently of backing.
+
+Two large pads represent the left and right sticks. Tap with a mouse or separate touch pointers, use **F** for left and **J** for right, or focus either button and activate it with the keyboard. Holding a key does not generate repeated strikes. With advance cues enabled, bars descend over a two-second real-time preview towards the strike line: left/right bars specify sticking, and a single neutral **Either** bar spans both lanes for an unspecified hand. With cues off, no note prompts appear before or at an attack; the pads only respond to player input. Metronome and backing remain separate options. No haptics are used.
+
+Drum timing, weighted hit credit, stars and streaks use the same rules as the lyre. Either pad can claim an unspecified attack once; another tap is extra. A wrong-hand strike consumes the expected attack as a miss, breaks the streak, and receives no additional extra-tap penalty. It cannot be corrected by a second strike. Repeated same-hand notes remain separate attacks. Simultaneous opposite-hand targets accept separate fingers. Duplicate same-hand/onset voices require one strike. Roll targets follow the existing interpreted instructional movements, not the doubled audio contacts; unspecified rolls remain unspecified.
+
+Unit checks cover known/unknown sticking, terminal wrong-hand misses, simultaneous hands, duplicate voices, dense rolls, repeat passes, speed, delayed input timestamps and live percussion sound. Browser checks exercise shared setup/results, touch and F/J input, falling notes, cues-off attempts, wrong/extra taps, retry, history, interruption, unavailable parts, and phone/desktop/landscape bounds. Physical phone input and audible latency still need device verification.
+
 ## Instrument and interpretation configuration
 
 Edit **`trainer.config.json`** only for exceptions. Do not duplicate titles, tempo, keys or note sequences. Each entry uses the score filename without `.mscz`, an exact visible part name, and optionally the native instrument ID:
@@ -189,7 +199,9 @@ The visible instrument renderer is a replaceable SVG placeholder, not a full she
 - `src/score/repeats.ts`: repeat/ending order, shared playback expansion, tempo/key restoration and ties across adjacent played bars. Written bar numbers remain visible while seek/time use the expanded duration. Expansion is bounded to 10,000 bars and 200,000 notes.
 - `src/score/interpret.ts`: native tie joins, roll skeletons, tempo conversion and separate audio contacts.
 - `src/audio/transport.ts`: audio-clock scheduling, cancellation and per-part mixing.
-- `src/audio/beats.ts`, `src/game/scoring.ts`: count-in/metronome timing and stateless bell lyre challenge judging.
+- `src/audio/beats.ts`, `src/game/scoring.ts`: count-in/metronome timing and shared lyre/drum challenge judging.
+- `src/game/parts.ts`: playable challenge parts.
+- `src/ui/Challenge.tsx`, `LyreBoard.tsx`, `DrumBoard.tsx`: shared challenge screens and instrument boards.
 - `src/ui/`: catalogue, transport/part controls, practice screen and instrument renderers. Renderers consume normalised movements rather than native XML.
 - `tests/`: fixture/synthetic notation tests, catalogue regeneration, deterministic transport tests and real-browser interaction checks.
 
