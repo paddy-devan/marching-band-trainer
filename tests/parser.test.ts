@@ -21,7 +21,7 @@ describe('actual source scores', () => {
     expect(snare.every(n => !n.tremolo)).toBe(true);
     expect(snare.some((n, i) => i > 0 && n.hand === snare[i - 1].hand)).toBe(true);
   });
-  it('prefers visible Colonel Bogey metadata and keeps missing sticking unknown', () => {
+  it('prefers visible Colonel Bogey metadata and resolves every drum note to Right stick', () => {
     const score = fixture('colonel-bogey');
     expect(score.title).toBe('Colonel Bogey');
     expect(score.composer).toBe('Kenneth J. Alford');
@@ -30,9 +30,12 @@ describe('actual source scores', () => {
     expect(score.measures[0].signature).toEqual({ numerator: 4, denominator: 4 });
     const snare = score.notes.filter(n => n.partId === score.parts[1].id);
     expect(snare).toHaveLength(123);
-    expect(snare.filter(n => n.provenance === 'explicit')).toHaveLength(12);
-    expect(snare.slice(0, 12).map(n => n.hand)).toEqual(['R', 'R', 'R', 'L', 'R', 'L', 'R', 'R', 'L', 'R', 'L', 'R']);
-    expect(snare.slice(12).every(n => !n.hand)).toBe(true);
+    expect(snare.every(n => n.provenance === 'drum-map')).toBe(true);
+    expect(snare.every(n => n.hand === 'R' && n.pitch === 40)).toBe(true);
+    expect(score.parts[1].drums).toMatchObject({
+      38: { name: 'Left stick', hand: 'L', line: 1 },
+      40: { name: 'Right stick', hand: 'R', line: -1 },
+    });
     expect(snare.filter(n => n.tremolo)).toHaveLength(24);
     expect(score.keys[0].fifths).toBe(-5);
     expect(score.keys[0].mode).toBeUndefined();
@@ -42,7 +45,7 @@ describe('actual source scores', () => {
     expect(score.repeats).toEqual([{ start: 2, end: 9, count: 2 }]);
     expect(score.endings.map(e => [e.start, e.end, e.passes])).toEqual([[6, 10, [1]], [10, 11, [2]]]);
     expect(score.warnings.some(w => /Repeats/.test(w))).toBe(false);
-    expect(score.warnings.filter(w => /unspecified sticking/.test(w))).toHaveLength(1);
+    expect(score.warnings.filter(w => /sticking/.test(w))).toHaveLength(0);
   });
   it('also loads the extra 12/8 score from the source directory', () => {
     const score = fixture('hollyrood');
