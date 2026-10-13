@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { interpretScore } from '../src/score/interpret';
+import { interpretScore, secondsAt } from '../src/score/interpret';
 import { parseScore } from '../src/score/parser';
 import { BarNotes, barCues } from '../src/ui/BarNotes';
 import { highlightedMovements } from '../src/ui/cues';
@@ -12,6 +12,16 @@ const repeated = () => interpretScore(parseScore(synthetic([
 ]), 'test'));
 
 describe('bar cues and shared strike highlights', () => {
+  it('shows only Roll L for the Ready Aye Ready quaver pickup in 6/8', () => {
+    const { score, movements } = interpretScore(fixture('ready-aye-ready'));
+    const part = score.parts.find(p => p.renderer === 'snare')!;
+    const partMovements = movements.filter(m => m.partId === part.id);
+    const html = renderToStaticMarkup(createElement(BarNotes, { score, part, movements: partMovements, measure: score.measures[0], position: 0, active: highlightedMovements(partMovements, 0) }));
+    const notes = document.createElement('div');
+    notes.innerHTML = html;
+    expect([...notes.querySelectorAll('.current .note-cue')].map(note => note.textContent)).toEqual(['Roll L']);
+    expect(barCues(score, partMovements, score.measures[0])[0].end).toBe(secondsAt(score, score.measures[1].start));
+  });
   it('releases a repeated pitch briefly before lighting the next strike', () => {
     const { movements } = repeated();
     expect(highlightedMovements(movements, 0.4)).toEqual([movements[0]]);

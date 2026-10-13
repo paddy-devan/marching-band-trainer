@@ -169,7 +169,7 @@ Sticking priority is explicit position-anchored annotation, named drum mapping, 
 
 `rollProfile` options:
 
-- `repertoire` (default): semiquaver hand movements in simple time; quaver movements in 12/8.
+- `repertoire` (default): semiquaver hand movements in simple time; quaver movements in compound /8 meters such as 6/8, 9/8 and 12/8 (numerator greater than three and divisible by three). A quaver roll produces one skeleton movement; a dotted-crotchet roll produces three. Simple 3/8 retains semiquaver spacing.
 - `sixteenth`: semiquaver movements regardless of meter.
 - `eighth`: quaver movements regardless of meter.
 - `disabled`: do not expand rolls; keep a parser diagnostic.
@@ -209,4 +209,4 @@ The visible instrument renderer is a replaceable SVG placeholder, not a full she
 - `src/ui/`: catalogue, transport/part controls, practice screen and instrument renderers. Renderers consume normalised movements rather than native XML.
 - `tests/`: fixture/synthetic notation tests, catalogue regeneration, deterministic transport tests and real-browser interaction checks.
 
-Automated checks cover the 43 resolved side-drum notes in 16 OBR, 123 drum notes using the Left stick / Right stick mapping and 24 roll marks in Colonel Bogey, the tied minim-plus-quaver's ten movements, three-note tie chains, dotted 12/8 rolls, shared tempo changes, spelling/octaves, multi-staff/voice alignment, unresolved configuration, archive errors, cancellations, immediate gains and real UI state. Browser QA uses desktop and emulated phone/tablet widths; this does not establish compatibility with actual iOS/Android hardware. An analyser verifies nonzero Web Audio output and silence after muting; sound quality has not been listened to.
+Automated checks cover the 43 resolved side-drum notes in 16 OBR, 123 drum notes using the Left stick / Right stick mapping and 24 roll marks in Colonel Bogey, the tied minim-plus-quaver's ten movements, three-note tie chains, dotted 6/8, 9/8 and 12/8 rolls, Ready Aye Ready's single-movement pickup, compound roll ties, simple 3/8 and explicit roll-profile overrides, shared tempo changes, spelling/octaves, multi-staff/voice alignment, unresolved configuration, archive errors, cancellations, immediate gains and real UI state. Browser QA uses desktop and emulated phone/tablet widths; this does not establish compatibility with actual iOS/Android hardware. An analyser verifies nonzero Web Audio output and silence after muting; sound quality has not been listened to.

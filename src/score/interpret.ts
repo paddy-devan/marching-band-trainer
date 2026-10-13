@@ -25,7 +25,8 @@ export function rollInterval(score: Score, n: WrittenNote, part: Part): Fraction
   if (part.rollProfile === 'sixteenth') return fraction(1, 4);
   if (part.rollProfile === 'eighth') return fraction(1, 2);
   const sig = score.measures[n.measure].signature;
-  return sig.numerator === 12 && sig.denominator === 8 ? fraction(1, 2) : fraction(1, 4);
+  const compound = sig.denominator === 8 && sig.numerator > 3 && sig.numerator % 3 === 0;
+  return compound ? fraction(1, 2) : fraction(1, 4);
 }
 export function interpretScore(score: Score): Timeline {
   score = expandRepeats(score);
