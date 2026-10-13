@@ -8,6 +8,13 @@ export type PlayOptions = { countIn?: boolean; metronome?: boolean; outputTiming
 type Contact = { at: number; seconds: number; velocity: number; movement: Movement };
 type SoundSource = AudioScheduledSourceNode;
 
+// Device reports can be invalid on Firefox Android. Allow even slow wireless
+// output, but never let an unbounded/negative delay freeze the challenge clock.
+const MAX_OUTPUT_DELAY = 2;
+function deviceLatency(delay: number | undefined) {
+  return typeof delay === 'number' && Number.isFinite(delay) && delay >= 0 && delay <= MAX_OUTPUT_DELAY ? delay : 0;
+}
+
 export class Transport {
   private context?: AudioContext;
   private master?: GainNode;
@@ -49,11 +56,19 @@ export class Transport {
   readPosition(timestamp = performance.now()) {
     const ctx = this.context;
     if (!this.state.playing || !ctx) return this.state.position;
-    const output = ctx.getOutputTimestamp?.();
     const now = performance.now();
-    const audioTime = output && typeof output.contextTime === 'number' && typeof output.performanceTime === 'number' && output.contextTime > 0 && Math.abs(now - output.performanceTime) < 1000
-      ? output.contextTime + (timestamp - output.performanceTime) / 1000
-      : ctx.currentTime + (timestamp - now) / 1000 - (ctx.baseLatency || 0) - (ctx.outputLatency || 0);
+    const renderTime = ctx.currentTime;
+    let audibleTime = renderTime - deviceLatency(ctx.baseLatency) - deviceLatency(ctx.outputLatency);
+    try {
+      const output = ctx.getOutputTimestamp?.();
+      if (output && typeof output.contextTime === 'number' && typeof output.performanceTime === 'number'
+        && Number.isFinite(output.contextTime) && Number.isFinite(output.performanceTime)
+        && output.contextTime > 0 && Math.abs(now - output.performanceTime) < 1000) {
+        const outputNow = output.contextTime + (now - output.performanceTime) / 1000;
+        if (outputNow <= renderTime + 0.05 && outputNow >= renderTime - MAX_OUTPUT_DELAY) audibleTime = outputNow;
+      }
+    } catch { /* Some devices expose the API but cannot provide an output timestamp. */ }
+    const audioTime = audibleTime + (timestamp - now) / 1000;
     return Math.min(this.timeline.duration, this.anchorPosition + Math.max(0, audioTime - this.anchorTime) * this.state.speed);
   }
   private setup() {
@@ -203,8 +218,8 @@ export class Transport {
     if (!part || !this.context || this.context.state !== 'running' || this.disposed) return;
     const movement: Movement = {
       id: 'tap', partId, position: { n: 0, d: 1 }, duration: { n: 1, d: 1 },
-      time: 0, seconds: 0.35 * this.state.speed, pitch: soundingPitch - part.register.transpose,
-      percussion: false, provenance: 'unknown', roll: false, velocity: 0.8, sourceIds: [], sourceId: 'tap',
+      time: 0, seconds: 0.35 * this.state.speed, pitch: part.percussion ? soundingPitch : soundingPitch - part.register.transpose,
+      percussion: part.percussion, provenance: 'unknown', roll: false, velocity: 0.8, sourceIds: [], sourceId: 'tap',
     };
     this.sound({ at: 0, seconds: movement.seconds, velocity: movement.velocity, movement }, this.context.currentTime, this.master);
   }
