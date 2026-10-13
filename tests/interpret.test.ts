@@ -24,13 +24,40 @@ describe('rolls, ties and shared timing', () => {
     expect(timeline.movements).toHaveLength(count);
     expect(timeline.movements[0].hand).toBe('R');
   });
-  it('uses three quaver movements for a dotted crotchet in 12/8', () => {
-    const score = parseScore(synthetic([measure(time(12, 8) + tempo(120)), measure('<Sticking><text>R</text></Sticking>' + chord('quarter', 38, '<dots>1</dots><TremoloSingleChord><subtype>r32</subtype></TremoloSingleChord>'))]), 'test');
+  it.each([6, 9, 12])('uses three quaver movements for a dotted crotchet in %i/8', numerator => {
+    const score = parseScore(synthetic([measure(time(numerator, 8) + tempo(120)), measure('<Sticking><text>R</text></Sticking>' + chord('quarter', 38, '<dots>1</dots><TremoloSingleChord><subtype>r32</subtype></TremoloSingleChord>'))]), 'test');
     const roll = interpretScore(score).movements;
     expect(roll.map(m => value(m.position))).toEqual([0, 0.5, 1]);
     expect(roll.map(m => m.hand)).toEqual(['R', 'L', 'R']);
     expect(audioContacts(roll[0])).toHaveLength(2);
     expect(audioContacts(roll.at(-1)!)[1].time).toBeLessThan(secondsAt(score, fraction(3, 2)));
+  });
+  it('keeps semiquaver roll spacing in simple 3/8', () => {
+    const score = parseScore(synthetic([measure(time(3, 8) + tempo(120)), measure('<Sticking><text>L</text></Sticking>' + chord('eighth', 38, '<TremoloSingleChord><subtype>r16</subtype></TremoloSingleChord>'))]), 'test');
+    const roll = interpretScore(score).movements;
+    expect(roll.map(m => value(m.position))).toEqual([0, 0.25]);
+    expect(roll.map(m => m.hand)).toEqual(['L', 'R']);
+  });
+  it('preserves an explicit semiquaver profile in compound time', () => {
+    const score = parseScore(synthetic([measure(time(6, 8) + tempo(120)), measure('<Sticking><text>L</text></Sticking>' + chord('eighth', 38, '<TremoloSingleChord><subtype>r16</subtype></TremoloSingleChord>'))]), 'test', { scores: { test: { parts: [{ part: 'Side Drum', rollProfile: 'sixteenth' }] } } });
+    const roll = interpretScore(score).movements;
+    expect(roll.map(m => value(m.position))).toEqual([0, 0.25]);
+    expect(roll.map(m => m.hand)).toEqual(['L', 'R']);
+  });
+  it('keeps quaver phase through a tied 6/8 roll without another boundary attack', () => {
+    const next = '<Spanner type="Tie"><next><location><measures>1</measures></location></next></Spanner>';
+    const previous = '<Spanner type="Tie"><prev><location><measures>-1</measures></location></prev></Spanner>';
+    const tremolo = '<TremoloSingleChord><subtype>r16</subtype></TremoloSingleChord>';
+    const score = parseScore(synthetic([
+      measure(time(6, 8) + tempo(120)) + measure(''),
+      measure('<Sticking><text>L</text></Sticking>' + chord('half', 38, '<dots>1</dots>' + tremolo, next)) + measure(chord('eighth', 38, tremolo, previous)),
+    ]), 'test');
+    expect(score.ties).toHaveLength(1);
+    const roll = interpretScore(score).movements;
+    expect(roll.map(m => value(m.position))).toEqual([0, 0.5, 1, 1.5, 2, 2.5, 3]);
+    expect(roll.map(m => m.hand)).toEqual(['L', 'R', 'L', 'R', 'L', 'R', 'L']);
+    expect(value(add(roll.at(-1)!.position, roll.at(-1)!.duration))).toBe(3.5);
+    expect(roll.at(-1)!.sourceId).toBe(score.ties[0].to);
   });
   it('does not invent hands for unknown rolls or ties between adjacent identical notes', () => {
     const score = parseScore(synthetic([measure(time() + tempo(120)), measure(chord('quarter', 38, '<TremoloSingleChord><subtype>r32</subtype></TremoloSingleChord>') + chord('quarter', 38))]), 'test');
