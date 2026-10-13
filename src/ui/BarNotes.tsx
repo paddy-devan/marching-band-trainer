@@ -51,7 +51,8 @@ export function BarNotes({ score, part, movements, measure, position, active }: 
         return <li key={`${cue.start}:${index}`} className={`note-cue ${sounding || resting ? 'lit' : ''} ${played ? 'played' : ''} ${!cue.movements.length ? 'rest' : ''}`} aria-current={sounding || resting ? 'true' : undefined}>
           {labels.length ? labels.map(label => {
             const pitch = label.match(/^([A-G][♯♭]?)(-?\d+)$/);
-            return <span key={label}>{pitch ? <>{pitch[1]}<sub className="note-octave">{pitch[2]}</sub></> : label}</span>;
+            const roll = part.renderer === 'snare' && label.endsWith(' Roll');
+            return <span key={label}>{pitch ? <>{pitch[1]}<sub className="note-octave">{pitch[2]}</sub></> : roll ? <>{label.slice(0, -5)}<small className="note-roll"> Roll</small></> : label}</span>;
           }) : <span>Rest</span>}
         </li>;
       })}
