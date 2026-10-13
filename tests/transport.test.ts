@@ -160,11 +160,53 @@ describe('audio-clock transport', () => {
     expect(transport.getSnapshot().position).toBe(0);
     expect(transport.readPosition(performance.now() - 20)).toBeCloseTo(0.945);
     context.currentTime = 4.2;
+    Object.assign(context, { getOutputTimestamp: () => ({ contextTime: 3.95, performanceTime: performance.now() }) });
     vi.advanceTimersByTime(25);
     expect(transport.getSnapshot().playing).toBe(true); // wait for the audible end
     Object.assign(context, { getOutputTimestamp: () => ({ contextTime: 4.1, performanceTime: performance.now() }) });
     vi.advanceTimersByTime(25);
     expect(transport.getSnapshot().playing).toBe(false);
+    transport.dispose();
+  });
+  it.each([-50, Infinity, NaN, 20])('keeps cues and input moving when output latency is invalid (%s)', async latency => {
+    const { context, transport } = setup();
+    Object.assign(context, {
+      outputLatency: latency,
+      getOutputTimestamp: () => ({ contextTime: -50, performanceTime: performance.now() }),
+    });
+    await transport.play({ countIn: true, outputTiming: true });
+    context.currentTime = 2.535;
+    expect(transport.readPosition()).toBeCloseTo(0.5);
+    expect(transport.readPosition(performance.now() - 20)).toBeCloseTo(0.48);
+    vi.advanceTimersByTime(25);
+    expect(transport.getSnapshot().position).toBeCloseTo(0.5);
+    context.currentTime = 6.1;
+    vi.advanceTimersByTime(25);
+    expect(transport.getSnapshot()).toMatchObject({ playing: false, position: 4 });
+    transport.dispose();
+  });
+
+  it.each(['future', 'stale', 'infinite', 'throws'] as const)('falls back from a %s output timestamp without interrupting playback', async fault => {
+    const { context, transport } = setup();
+    await transport.play({ outputTiming: true });
+    context.currentTime = 3.535;
+    Object.assign(context, { baseLatency: 0.01, outputLatency: 0.025, getOutputTimestamp: () => {
+      if (fault === 'throws') throw new Error('Output timestamp unavailable');
+      return { contextTime: fault === 'future' ? 10 : fault === 'infinite' ? Infinity : 0.01, performanceTime: performance.now() };
+    } });
+    expect(transport.readPosition()).toBeCloseTo(3.465);
+    expect(transport.readPosition(performance.now() - 20)).toBeCloseTo(3.445);
+    transport.dispose();
+  });
+
+  it('retains normal output latency compensation and rejects invalid base latency', async () => {
+    const { context, transport } = setup();
+    await transport.play({ outputTiming: true });
+    context.currentTime = 1.535;
+    Object.assign(context, { baseLatency: 0.01, outputLatency: 0.2 });
+    expect(transport.readPosition()).toBeCloseTo(1.29);
+    Object.assign(context, { baseLatency: Infinity });
+    expect(transport.readPosition()).toBeCloseTo(1.3);
     transport.dispose();
   });
   it('plays user strikes despite muted lyre backing, and cancels star sounds on exit', async () => {
@@ -186,5 +228,19 @@ describe('audio-clock transport', () => {
     expect(context.sources[before + 2].frequency.calls[0].value).toBeGreaterThan(context.sources[before].frequency.calls[0].value);
     transport.dispose();
     expect(context.sources.every(s => s.stop.mock.calls.some(args => args.length === 0))).toBe(true);
+  });
+  it('plays live drum taps as short noise bursts through the master despite muted backing', async () => {
+    const { context, transport, score } = setup();
+    const drum = score.parts[1];
+    transport.setMix({ [drum.id]: { muted: true, solo: false } });
+    await transport.play();
+    transport.strike(drum.id, 38);
+    const tap = context.sources.at(-1)!;
+    expect(tap.buffer).toBeDefined();
+    expect(tap.frequency.calls).toHaveLength(0);
+    expect(tap.stop.mock.calls[0][0] - tap.start.mock.calls[0][0]).toBeCloseTo(0.17);
+    expect(context.gains.at(-1)!.connect).toHaveBeenCalledWith(context.gains[0]);
+    transport.dispose();
+    expect(tap.stop).toHaveBeenCalledWith();
   });
 });
