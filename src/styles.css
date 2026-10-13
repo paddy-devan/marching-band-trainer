@@ -81,9 +81,19 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .lyre-bar.lit + .bar-letter .bar-octave { fill: #354b57; }
 .mallet line { stroke: #83949e; stroke-width: 5; stroke-linecap: round; }.mallet circle { fill: var(--cyan); stroke: var(--cyan-dark); stroke-width: 2; }
 .mallet.moving { transition: transform .025s linear; }
-.drum-shell { fill: #d9e2e7; stroke: #8b9da8; stroke-width: 3; }.drum-head { fill: #f5f7f8; stroke: #8b9da8; stroke-width: 4; }.drum-rim { stroke: #8b9da8; stroke-width: 5; }.drum-inner { fill: none; stroke: #e0e5e9; stroke-width: 2; }
+.drum-shell { fill: #d9e2e7; stroke: #8b9da8; stroke-width: 3; }.drum-head { fill: #f5f7f8; stroke: #8b9da8; stroke-width: 4; }
+.snare .drum-shell { fill: #dce4e9; stroke: none; }
+.snare-body-edge { fill: none; stroke: #8b9da8; stroke-width: 1.5; }
+.snare .drum-head { fill: #fafbfc; stroke: #becbd3; stroke-width: 1.5; }
+.snare-rim-top { fill: #e8edf0; stroke: #899ba7; stroke-width: 1.5; }
+.snare-recess { fill: #c5d0d8; stroke: #a5b4be; stroke-width: 1; }
+.snare-rim-band { fill: #e3e9ed; stroke: #899ba7; stroke-width: 1.5; }
+.snare-rim-edge { fill: none; stroke: #899ba7; stroke-width: 1.5; }
 .strike { fill: #e5ebee; stroke: #d2dce2; stroke-width: 1; }.strike.lit { fill: var(--cyan); stroke: var(--cyan-dark); }.strike.neutral { fill: var(--cyan); stroke: var(--cyan-dark); }
-.stick line { stroke: #8b9ba5; stroke-width: 9; stroke-linecap: round; }.left-stick { transform: rotate(-14deg); }.right-stick { transform: rotate(14deg); }.left-stick.down { transform: rotate(10deg); }.right-stick.down { transform: rotate(-10deg); }
+.drum-roll { fill: none; stroke: #07596f; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.stick { transform-origin: 0 0; transform: rotate(28deg); }.stick.down { transform: rotate(47.5deg); }
+.stick-wood { fill: #c9b18d; stroke: #8d775c; stroke-width: 1; stroke-linejoin: round; }
+.stick-shine { fill: none; stroke: #efe0c7; stroke-width: 1.5; stroke-linecap: round; }
 .instrument-svg text { font-family: 'DM Sans', system-ui, sans-serif; }.snare > text, .pulse > text { fill: var(--muted); font-size: 14px; }
 .bar-notes { border-top: 1px solid var(--line); margin-top: 16px; }
 .bar-notes-row { padding: 16px 0; }
@@ -93,6 +103,8 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .note-cue { display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 44px; padding: 9px 10px; border-radius: 5px; background: var(--surface); color: var(--ink); font-family: Manrope, system-ui, sans-serif; font-size: 20px; font-weight: 750; line-height: 1.4; transition: background-color .025s, color .025s; }
 .note-octave { font-size: .6em; font-weight: 500; line-height: 0; vertical-align: -.2em; color: var(--muted); margin-left: 1px; }
 .note-cue.lit .note-octave { color: #3f5662; }
+.note-roll { display: inline; font-family: 'DM Sans', system-ui, sans-serif; font-size: .6em; font-weight: 400; color: var(--muted); }
+.note-cue.lit .note-roll { color: #3f5662; }
 .note-cue.played { color: var(--muted); background: #f8f9fa; }
 .queued .note-cue { font-size: 17px; color: var(--muted); background: #f8f9fa; }
 .note-cue.rest { font-size: 13px; font-weight: 500; }
@@ -143,7 +155,7 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
   .note-line { gap: 6px; }.note-cue { font-size: 18px; padding: 8px; }.queued .note-cue { font-size: 16px; }
 }
 @media (max-width: 360px) { .practice, .catalogue { padding-left: 14px; padding-right: 14px; }.instrument-stage { min-height: 235px; }.part-row > strong { font-size: 12px; }.part-actions { gap: 2px; } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; }.stick { transform: none !important; }.mallet { transform: var(--rest-pose) !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; }.stick { transform: rotate(28deg) !important; }.mallet { transform: var(--rest-pose) !important; } }
 
 /* The challenge owns the viewport; the score page retains its normal layout. */
 .visual-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }

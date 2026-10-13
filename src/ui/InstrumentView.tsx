@@ -1,11 +1,11 @@
-import { memo, useMemo, type CSSProperties } from 'react';
+import { memo, useId, useMemo, type CSSProperties } from 'react';
 import type { Movement, Part } from '../score/model';
 import { pitchLabel } from '../score/labels';
 import { malletPose, type MalletTarget } from './mallet';
 
 export function movementLabel(m: Movement, part: Part) {
   if (!m.percussion) return pitchLabel(m.pitch + part.register.transpose, m.tpc, 'sharps');
-  if (part.renderer === 'snare') return m.roll ? `Roll ${m.hand || '—'}` : m.hand || '—';
+  if (part.renderer === 'snare') return m.roll ? `${m.hand || '—'} Roll` : m.hand || '—';
   return 'Strike';
 }
 type Props = { part: Part; active: Movement[]; position: number; movements?: Movement[]; speed?: number; playing?: boolean };
@@ -100,20 +100,39 @@ function Lyre({ part, active, position, movements = active, speed = 1, playing =
   </div>;
 }
 function Snare({ active }: Pick<Props, 'active' | 'position'>) {
+  const headClip = useId();
   // Sticks only move for known hands. Unknown hands use a central neutral indicator.
   const hands = new Set(active.map(m => m.hand));
   const left = hands.has('L');
   const right = hands.has('R');
-  return <svg viewBox="0 0 480 360" role="img" aria-label={`Side drum: ${active.length ? active.map(m => m.hand || 'unspecified hand').join(', ') : 'rest'}`} className="instrument-svg snare">
-    <ellipse cx="240" cy="211" rx="147" ry="94" className="drum-shell" />
-    <path d="M93 161 V210 M387 161 V210" className="drum-rim" />
-    <ellipse cx="240" cy="166" rx="147" ry="89" className="drum-head" />
-    <ellipse cx="240" cy="166" rx="134" ry="77" className="drum-inner" />
+  const rolls = new Set(active.filter(m => m.roll).map(m => m.hand));
+  return <svg viewBox="0 0 480 360" role="img" aria-label={`Side drum: ${active.length ? active.map(m => `${m.hand || 'unspecified hand'}${m.roll ? ' roll' : ''}`).join(', ') : 'rest'}`} className="instrument-svg snare">
+    <defs><clipPath id={headClip}><ellipse cx="240" cy="156" rx="140" ry="64" /></clipPath></defs>
+    <path d="M100 170 H380 V246 A147 74 0 0 1 100 246 Z" className="drum-shell" />
+    <path d="M100 170 V246 M380 170 V246" className="snare-body-edge" />
+    <ellipse cx="240" cy="156" rx="140" ry="64" className="snare-recess" />
+    {/* The recessed head stays inside the opening; the hoop is drawn over it. */}
+    <ellipse cx="240" cy="172" rx="140" ry="64" className="drum-head" clipPath={`url(#${headClip})`} />
+    <path d="M93 156 a147 74 0 1 1 294 0 a147 74 0 1 1 -294 0 Z M100 156 a140 64 0 1 1 280 0 a140 64 0 1 1 -280 0 Z" fillRule="evenodd" className="snare-rim-top" />
+    <path d="M93 156 A147 74 0 0 0 387 156 V182 A147 74 0 0 1 93 182 Z" className="snare-rim-band" />
+    <path d="M93 156 A147 74 0 0 0 387 156" className="snare-rim-edge" />
     <circle cx="176" cy="173" r={left ? 23 : 13} className={`strike ${left ? 'lit left' : ''}`} />
     <circle cx="304" cy="173" r={right ? 23 : 13} className={`strike ${right ? 'lit right' : ''}`} />
     {hands.has(undefined) ? <circle cx="240" cy="173" r="19" className="strike lit neutral" /> : null}
-    <g className={`stick left-stick ${left ? 'down' : ''}`} style={{ transformOrigin: '155px 125px' }}><line x1="70" y1="39" x2="177" y2="144" /></g>
-    <g className={`stick right-stick ${right ? 'down' : ''}`} style={{ transformOrigin: '325px 125px' }}><line x1="410" y1="39" x2="303" y2="144" /></g>
+    {(['L', 'R', undefined] as const).map(hand => rolls.has(hand) ? <path key={hand || 'neutral'}
+      transform={`translate(${hand === 'L' ? 176 : hand === 'R' ? 304 : 240} 184)`}
+      d="M-15 -1 L-9 -6 L-3 -1 L3 -6 L9 -1 L15 -6 M-15 6 L-9 1 L-3 6 L3 1 L9 6 L15 1"
+      className="drum-roll" /> : null)}
+    <g transform="translate(88 77)"><DrumStick down={left} hand="left" /></g>
+    <g transform="translate(392 77) scale(-1 1)"><DrumStick down={right} hand="right" /></g>
     <text x="153" y="320" textAnchor="middle">Left · L</text><text x="327" y="320" textAnchor="middle">Right · R</text>
   </svg>;
+}
+
+function DrumStick({ down, hand }: { down: boolean; hand: 'left' | 'right' }) {
+  // Local zero is the grip, about a fifth of the way along from the butt.
+  return <g className={`stick ${hand}-stick ${down ? 'down' : ''}`}>
+    <path d="M-32 -5 Q-38 -5 -38 0 Q-38 5 -32 5 L64 5 Q88 4 108 1.8 L116 1.8 C119 6 130 6 134 2 Q136 0 134 -2 C130 -6 119 -6 116 -1.8 L108 -1.8 Q88 -4 64 -5 Z" className="stick-wood" />
+    <path d="M-30 -2 H64 Q88 -2 106 0" className="stick-shine" />
+  </g>;
 }
