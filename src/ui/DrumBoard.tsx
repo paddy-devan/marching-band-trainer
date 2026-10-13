@@ -15,6 +15,8 @@ export function DrumBoard({ targets, position, speed, preview, attempt, feedback
     const remaining = (target.time - position) / speed;
     return remaining <= LOOK_AHEAD && remaining >= -target.window && !attempt?.isJudged(target.id);
   }) : [];
+  const next = preview ? targets.find(target => target.time + target.window * speed >= position && !attempt?.isJudged(target.id)) : undefined;
+  const eitherHand = next !== undefined && !next.hand;
   return <div className="drum-board" role="group" aria-label="Playable drum" tabIndex={-1} ref={board}
     onKeyDown={event => {
       if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -25,12 +27,20 @@ export function DrumBoard({ targets, position, speed, preview, attempt, feedback
     }}>
     <div className={`drum-track${preview ? '' : ' cues-off'}`} aria-hidden="true">
       <div className="drum-lane left" /><div className="drum-lane right" />
-      {preview ? upcoming.map(target => <div key={target.id}
-        className={`drum-note ${target.hand === 'L' ? 'left' : target.hand === 'R' ? 'right' : 'either'}`}
-        style={{ top: `${(1 - (target.time - position) / speed / LOOK_AHEAD) * 100}%` }}>
-        <span>{target.hand ?? 'Either'}</span>
-      </div>) : <span className="drum-memory">Cues off · Play from memory</span>}
-      <div className="drum-strike-line" />
+      {preview ? <>
+        <div className="drum-cues">
+          {eitherHand ? <div className="drum-cue-bar drum-hit-target either">Either</div> : <>
+            <div className="drum-cue-bar drum-hit-target left">L</div>
+            <div className="drum-cue-bar drum-hit-target right">R</div>
+          </>}
+          {upcoming.map(target => <div key={target.id} data-time={target.time}
+            className={`drum-cue-bar drum-note ${target.hand === 'L' ? 'left' : target.hand === 'R' ? 'right' : 'either'}`}
+            style={{ top: `${(1 - (target.time - position) / speed / LOOK_AHEAD) * 100}%` }}>
+            <span>{target.hand ?? 'Either'}</span>
+          </div>)}
+        </div>
+        <span className="drum-hit-label">Hit when bars overlap the outlines</span>
+      </> : <span className="drum-memory">Cues off · Play from memory</span>}
     </div>
     <div className="drum-pads" role="group" aria-label="Drum head">
       {(['L', 'R'] as const).map(hand => {

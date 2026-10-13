@@ -137,6 +137,7 @@ test('cues off gives no prompts while wrong hands miss, either hands score, and 
   await page.getByLabel('Advance note cues').uncheck();
   await page.getByRole('button', { name: 'Start attempt' }).click();
   await expect(page.locator('.drum-note')).toHaveCount(0);
+  await expect(page.locator('.drum-hit-target, .drum-hit-label')).toHaveCount(0);
   await page.screenshot({ path: path.join(tmpdir(), 'marching-band-drum-cues-off.png') });
   await strikeScheduled(page, 0, 'R');
   await expect(page.locator('.game-playing-status')).toContainText('Wrong hand');
@@ -192,6 +193,50 @@ test('simultaneous touch strikes score both hands while count-in taps and held k
   await expect(page.locator('.game-result')).toBeVisible();
   await expect(page.locator('.game-result-stats')).toHaveText('Perfect2Early / late0Missed0Extra / wrong0');
   await expect(page.locator('.game-result-score')).toHaveText('10 / 10', { timeout: 4000 });
+});
+
+test('falling bars exactly overlap their outlines at the scored onset across screen sizes', async ({ page }) => {
+  await shortDrumScore(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./#16obr/drum-challenge');
+  await page.getByRole('button', { name: '100%', exact: true }).click();
+  await page.getByRole('button', { name: 'Start attempt' }).click();
+
+  for (const index of [0, 2]) {
+    // Pin the audible clock to a real scheduled attack so geometry is measured
+    // at its scored time, rather than estimating a frame's animation position.
+    await expect.poll(() => page.evaluate(index => {
+      const data = (window as unknown as { drumAudio: { context?: AudioContext; strikes: { when: number; scheduled: boolean }[] } }).drumAudio;
+      const strike = data.strikes.filter(s => s.scheduled)[index];
+      return !!strike && !!data.context && data.context.currentTime >= strike.when;
+    }, index), { intervals: [10] }).toBe(true);
+    await page.evaluate(index => {
+      const data = (window as unknown as { drumAudio: { context: AudioContext; strikes: { when: number; scheduled: boolean }[] } }).drumAudio;
+      const when = data.strikes.filter(s => s.scheduled)[index].when;
+      data.context.getOutputTimestamp = () => ({ contextTime: when, performanceTime: performance.now() });
+    }, index);
+    const note = page.locator(`.drum-note[data-time="${index / 2}"]`);
+    const outline = page.locator(`.drum-hit-target.${index === 0 ? 'left' : 'either'}`);
+    await expect(outline).toBeVisible();
+    for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 1440, height: 1000 }]) {
+      await page.setViewportSize(viewport);
+      await expect.poll(async () => {
+        const bar = await note.boundingBox();
+        const target = await outline.boundingBox();
+        return bar && target ? Math.abs(bar.y - target.y) : Infinity;
+      }, { intervals: [10] }).toBeLessThan(0.5);
+      const bar = (await note.boundingBox())!;
+      const target = (await outline.boundingBox())!;
+      expect(bar.x).toBeCloseTo(target.x, 1);
+      expect(bar.width).toBeCloseTo(target.width, 1);
+      expect(bar.height).toBeCloseTo(target.height, 1);
+      const track = (await page.locator('.drum-track').boundingBox())!;
+      expect(target.y + target.height).toBeLessThan(track.y + track.height);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: path.join(tmpdir(), `marching-band-drum-hit-${index === 0 ? 'left' : 'either'}.png`) });
+  }
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
 });
 
 test.describe('mobile audio clock', () => {

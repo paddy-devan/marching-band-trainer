@@ -171,7 +171,7 @@ export function Challenge({ timeline, mode, onExit }: { timeline: Timeline; mode
         <div className="speed-presets">{[0.5, 0.75, 1, 1.25].map(speed => <button key={speed} aria-pressed={settings.speed === speed} onClick={() => setSettings(s => ({ ...s, speed }))}>{speed * 100}%</button>)}</div>
       </div>
       <div className="game-options">
-        <label><span><strong>Advance note cues</strong><small>{drum ? 'Show falling notes before each strike. Turn off to play from memory with no note prompts.' : 'Outline the next bars a little ahead of the strike.'}</small></span><input type="checkbox" checked={settings.preview} onChange={e => setSettings(s => ({ ...s, preview: e.target.checked }))} /></label>
+        <label><span><strong>Advance note cues</strong><small>{drum ? 'Tap when each falling bar overlaps its outline. Turn off to play from memory with no note prompts.' : 'Outline the next bars a little ahead of the strike.'}</small></span><input type="checkbox" checked={settings.preview} onChange={e => setSettings(s => ({ ...s, preview: e.target.checked }))} /></label>
         <label><span><strong>Metronome</strong><small>{drum ? 'A steady click alongside the music.' : 'A steady click alongside the drums.'}</small></span><input type="checkbox" checked={settings.metronome} onChange={e => setSettings(s => ({ ...s, metronome: e.target.checked }))} /></label>
         <label><span><strong>{backingLabel}</strong><small>{drum ? 'Hear the selected drum part as you play.' : 'Hear the written melody as you play.'}</small></span><input type="checkbox" checked={settings.backing} onChange={e => setSettings(s => ({ ...s, backing: e.target.checked }))} /></label>
       </div>
