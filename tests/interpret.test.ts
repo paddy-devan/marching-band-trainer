@@ -5,6 +5,22 @@ import { parseScore } from '../src/score/parser';
 import { chord, fixture, measure, synthetic, tempo, time } from './helpers';
 
 describe('rolls, ties and shared timing', () => {
+  it('uses four even contacts per quaver without changing the written hand pattern', () => {
+    const timeline = interpretScore(fixture('colonel-bogey'));
+    const movement = timeline.movements.find(m => m.roll)!;
+    const original = structuredClone(movement);
+    const contacts = audioContacts(movement);
+    expect(contacts).toHaveLength(2);
+    contacts.forEach((contact, i) => {
+      expect(contact.time).toBeCloseTo(movement.time + i * movement.seconds / 2);
+      expect(contact.seconds).toBeCloseTo(movement.seconds / 2);
+      expect(contact.velocity / movement.velocity).toBeCloseTo(0.65);
+    });
+    expect(contacts.at(-1)!.time + contacts.at(-1)!.seconds).toBeCloseTo(movement.time + movement.seconds);
+    expect(movement).toEqual(original);
+    const single = timeline.movements.find(m => !m.roll)!;
+    expect(audioContacts(single)).toEqual([{ time: single.time, seconds: single.seconds, velocity: single.velocity }]);
+  });
   it('joins the real minim-plus-quaver roll into exactly ten movements', () => {
     const score = fixture('colonel-bogey');
     const start = score.notes.find(n => n.tremolo && n.tieNext)!;
@@ -15,6 +31,9 @@ describe('rolls, ties and shared timing', () => {
     expect(roll.map(m => m.hand)).toEqual(['R', 'L', 'R', 'L', 'R', 'L', 'R', 'L', 'R', 'L']);
     expect(roll.map(m => value(m.position))).toEqual([6, 6.25, 6.5, 6.75, 7, 7.25, 7.5, 7.75, 8, 8.25]);
     expect(new Set(roll.map(m => value(m.position))).size).toBe(10);
+    const contacts = roll.flatMap(audioContacts);
+    expect(contacts).toHaveLength(20);
+    contacts.forEach((contact, i) => expect(contact.time).toBeCloseTo(secondsAt(score, fraction(48 + i, 8))));
     expect(roll.at(-1)!.sourceId).toBe(score.ties.find(t => t.from === start.id)!.to);
     expect(timeline.movements.some(m => m.partId === start.partId && value(m.position) === 8.5 && !m.roll)).toBe(true);
   });
@@ -29,20 +48,31 @@ describe('rolls, ties and shared timing', () => {
     const roll = interpretScore(score).movements;
     expect(roll.map(m => value(m.position))).toEqual([0, 0.5, 1]);
     expect(roll.map(m => m.hand)).toEqual(['R', 'L', 'R']);
-    expect(audioContacts(roll[0])).toHaveLength(2);
-    expect(audioContacts(roll.at(-1)!)[1].time).toBeLessThan(secondsAt(score, fraction(3, 2)));
+    expect(audioContacts(roll[0])).toHaveLength(4);
+    expect(audioContacts(roll.at(-1)!).at(-1)!.time).toBeLessThan(secondsAt(score, fraction(3, 2)));
   });
   it('keeps semiquaver roll spacing in simple 3/8', () => {
     const score = parseScore(synthetic([measure(time(3, 8) + tempo(120)), measure('<Sticking><text>L</text></Sticking>' + chord('eighth', 38, '<TremoloSingleChord><subtype>r16</subtype></TremoloSingleChord>'))]), 'test');
     const roll = interpretScore(score).movements;
     expect(roll.map(m => value(m.position))).toEqual([0, 0.25]);
     expect(roll.map(m => m.hand)).toEqual(['L', 'R']);
+    expect(roll.flatMap(audioContacts)).toHaveLength(4);
+  });
+  it('keeps four contacts per quaver with a quaver hand profile in simple time', () => {
+    const score = parseScore(synthetic([
+      measure(time() + tempo(120)),
+      measure(chord('quarter', 38, '<TremoloSingleChord><subtype>r32</subtype></TremoloSingleChord>')),
+    ]), 'test', { scores: { test: { parts: [{ part: 'Side Drum', rollProfile: 'eighth' }] } } });
+    const roll = interpretScore(score).movements;
+    expect(roll).toHaveLength(2);
+    expect(roll.flatMap(audioContacts).map(c => c.time)).toEqual([0, 0.0625, 0.125, 0.1875, 0.25, 0.3125, 0.375, 0.4375]);
   });
   it('preserves an explicit semiquaver profile in compound time', () => {
     const score = parseScore(synthetic([measure(time(6, 8) + tempo(120)), measure('<Sticking><text>L</text></Sticking>' + chord('eighth', 38, '<TremoloSingleChord><subtype>r16</subtype></TremoloSingleChord>'))]), 'test', { scores: { test: { parts: [{ part: 'Side Drum', rollProfile: 'sixteenth' }] } } });
     const roll = interpretScore(score).movements;
     expect(roll.map(m => value(m.position))).toEqual([0, 0.25]);
     expect(roll.map(m => m.hand)).toEqual(['L', 'R']);
+    expect(roll.flatMap(audioContacts)).toHaveLength(4);
   });
   it('keeps quaver phase through a tied 6/8 roll without another boundary attack', () => {
     const next = '<Spanner type="Tie"><next><location><measures>1</measures></location></next></Spanner>';

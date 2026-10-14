@@ -1,6 +1,7 @@
 import { audioContacts } from '../score/interpret';
 import type { Movement, Part, Timeline } from '../score/model';
 import { countIn, metronomeClicks, type Click } from './beats';
+import { SnareSynth } from './snare';
 
 export type Mix = Record<string, { muted: boolean; solo: boolean; volume?: number }>;
 export type TransportState = { playing: boolean; position: number; speed: number; status?: string };
@@ -31,7 +32,7 @@ export class Transport {
   private revision = 0;
   private disposed = false;
   private state: TransportState = { playing: false, position: 0, speed: 1 };
-  private noise?: AudioBuffer;
+  private snare?: SnareSynth;
   private parts: Map<string, Part>;
   private clicks: Click[] = [];
   private nextClick = 0;
@@ -94,9 +95,9 @@ export class Transport {
       }
     });
     this.updateGains();
-    // Prepare the shared snare noise before play so the first live strike does
-    // not have to allocate and fill a buffer on the input path.
-    if ([...this.parts.values()].some(p => p.percussion && !this.bassParts.has(p.id))) this.prepareNoise();
+    // Prepare procedural noise/room buffers before the first live strike.
+    if ([...this.parts.values()].some(p => p.percussion && !this.bassParts.has(p.id)))
+      this.snare = new SnareSynth(context, (source, nodes) => this.track(source, nodes));
   }
   async play(options: PlayOptions = {}) {
     if (this.disposed || this.state.playing || this.starting) return;
@@ -160,6 +161,7 @@ export class Transport {
     this.timer = undefined;
     for (const source of this.sources) { try { source.stop(); } catch { /* Already ended. */ } source.disconnect(); }
     this.sources.clear();
+    this.snare?.clearReverb();
   }
   private reanchor(position: number) {
     this.anchorPosition = position;
@@ -241,6 +243,10 @@ export class Transport {
     const part = this.parts.get(contact.movement.partId)!;
     const bus = this.buses.get(part.id)!;
     if (this.skipMuted && !output && bus.gain.value === 0) return;
+    if (contact.movement.percussion && !this.bassParts.has(part.id)) {
+      this.snare!.strike(when, contact.velocity, output || bus);
+      return;
+    }
     const length = Math.max(0.02, Math.min(contact.seconds / this.state.speed, 2));
     const gain = ctx.createGain();
     gain.connect(output || bus);
@@ -250,34 +256,15 @@ export class Transport {
     const decay = contact.movement.percussion ? Math.min(length, 0.16) : lyre ? Math.min(2.5, length * 1.2 + 0.06) : length;
     if (lyre) gain.gain.exponentialRampToValueAtTime(contact.velocity * 0.055, when + Math.min(0.3, length * 0.5));
     gain.gain.exponentialRampToValueAtTime(0.0001, when + decay);
-    if (!contact.movement.percussion || this.bassParts.has(part.id)) {
-      const osc = ctx.createOscillator();
-      osc.type = contact.movement.percussion ? 'sine' : 'triangle';
-      const frequency = contact.movement.percussion ? 95 : 440 * 2 ** ((contact.movement.pitch + part.register.transpose - 69) / 12);
-      osc.frequency.setValueAtTime(frequency, when);
-      if (contact.movement.percussion) osc.frequency.exponentialRampToValueAtTime(45, when + decay);
-      osc.connect(gain);
-      this.track(osc, [gain]);
-      osc.start(when);
-      osc.stop(when + decay + 0.01);
-    } else {
-      this.prepareNoise();
-      const noise = ctx.createBufferSource();
-      noise.buffer = this.noise!;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'highpass'; filter.frequency.value = 1200;
-      noise.connect(filter); filter.connect(gain);
-      this.track(noise, [filter, gain]);
-      noise.start(when);
-      noise.stop(when + decay + 0.01);
-    }
-  }
-  private prepareNoise() {
-    if (this.noise) return;
-    const ctx = this.context!;
-    this.noise = ctx.createBuffer(1, ctx.sampleRate * 0.3, ctx.sampleRate);
-    const data = this.noise.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const osc = ctx.createOscillator();
+    osc.type = contact.movement.percussion ? 'sine' : 'triangle';
+    const frequency = contact.movement.percussion ? 95 : 440 * 2 ** ((contact.movement.pitch + part.register.transpose - 69) / 12);
+    osc.frequency.setValueAtTime(frequency, when);
+    if (contact.movement.percussion) osc.frequency.exponentialRampToValueAtTime(45, when + decay);
+    osc.connect(gain);
+    this.track(osc, [gain]);
+    osc.start(when);
+    osc.stop(when + decay + 0.01);
   }
   dispose() {
     this.pause();

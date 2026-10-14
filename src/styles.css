@@ -155,7 +155,7 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
   .note-line { gap: 6px; }.note-cue { font-size: 18px; padding: 8px; }.queued .note-cue { font-size: 16px; }
 }
 @media (max-width: 360px) { .practice, .catalogue { padding-left: 14px; padding-right: 14px; }.instrument-stage { min-height: 235px; }.part-row > strong { font-size: 12px; }.part-actions { gap: 2px; } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; }.stick { transform: rotate(28deg) !important; }.mallet { transform: var(--rest-pose) !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; }.stick:not(.motion-enabled) { transform: rotate(28deg) !important; }.mallet { transform: var(--rest-pose) !important; } }
 
 /* The challenge owns the viewport; the score page retains its normal layout. */
 .visual-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }

@@ -84,12 +84,19 @@ export function interpretScore(score: Score): Timeline {
   return { score, movements, duration: secondsAt(score, score.duration), warnings };
 }
 
-// Audio contacts are separate from instructional skeleton movements. The initial
-// approximation uses two decaying snare contacts per movement, without changing hands.
+export const ROLL_CONTACTS_PER_QUAVER = 4;
+export function rollContactInterval(movement: Movement) {
+  return movement.seconds / (value(movement.duration) * 2 * ROLL_CONTACTS_PER_QUAVER);
+}
+// The audio rate is independent of the instructional hand-change profile:
+// four contacts per quaver, in either simple or compound time.
 export function audioContacts(movement: Movement): { time: number; seconds: number; velocity: number }[] {
   if (!movement.roll) return [{ time: movement.time, seconds: movement.seconds, velocity: movement.velocity }];
-  return [
-    { time: movement.time, seconds: movement.seconds / 2, velocity: movement.velocity * 0.75 },
-    { time: movement.time + movement.seconds / 2, seconds: movement.seconds / 2, velocity: movement.velocity * 0.55 },
-  ];
+  const seconds = rollContactInterval(movement);
+  const count = Math.ceil(value(movement.duration) * 2 * ROLL_CONTACTS_PER_QUAVER - 1e-8);
+  return Array.from({ length: count }, (_, i) => ({
+    time: movement.time + i * seconds,
+    seconds: Math.min(seconds, movement.seconds - i * seconds),
+    velocity: movement.velocity * 0.65,
+  }));
 }
