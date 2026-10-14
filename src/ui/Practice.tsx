@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Transport, type Mix } from '../audio/transport';
 import type { Timeline } from '../score/model';
 import { positionAt } from '../score/interpret';
@@ -9,6 +9,7 @@ import { highlightedMovements } from './cues';
 import { PartControls } from './PartControls';
 import { TransportControls } from './TransportControls';
 import { playableDrums, playableLyres, type ChallengeMode } from '../game/parts';
+import { DEFAULT_DRUM_TIMING, DRUM_TIMING_STORAGE_KEY, parseDrumTiming } from './drum-timing';
 
 export function Practice({ timeline, onChallenge }: { timeline: Timeline; onChallenge: (mode: ChallengeMode) => void }) {
   const score = timeline.score;
@@ -16,6 +17,11 @@ export function Practice({ timeline, onChallenge }: { timeline: Timeline; onChal
   const state = useSyncExternalStore(transport.subscribe, transport.getSnapshot);
   const [selected, setSelected] = useState(score.parts[0].id);
   const [mix, setMix] = useState<Mix>(() => Object.fromEntries(score.parts.map(p => [p.id, { muted: false, solo: false }])));
+  const [timing] = useState(() => {
+    try { return parseDrumTiming(localStorage.getItem(DRUM_TIMING_STORAGE_KEY)); }
+    catch { return { ...DEFAULT_DRUM_TIMING }; }
+  });
+  const readPosition = useCallback(() => transport.readPosition(), [transport]);
   useEffect(() => () => transport.dispose(), [transport]);
   const changeMix = (next: Mix) => { transport.setMix(next); setMix(next); };
   const part = score.parts.find(p => p.id === selected)!;
@@ -36,7 +42,7 @@ export function Practice({ timeline, onChallenge }: { timeline: Timeline; onChal
           {hasLyre ? <button className="challenge-button" onClick={() => { transport.pause(); onChallenge('lyre'); }}><span aria-hidden="true">✦</span> Bell lyre challenge</button> : null}
           {hasDrum ? <button className="challenge-button" onClick={() => { transport.pause(); onChallenge('drum'); }}><span aria-hidden="true">✦</span> Drum challenge</button> : null}
         </div></div>
-        <div className="instrument-stage"><InstrumentView part={part} active={active} position={state.position} movements={partMovements} speed={state.speed} playing={state.playing} /></div>
+        <div className="instrument-stage"><InstrumentView part={part} active={active} position={state.position} movements={partMovements} speed={state.speed} playing={state.playing} drumTiming={timing} readPosition={readPosition} /></div>
         <BarNotes score={score} part={part} movements={partMovements} measure={measure} position={state.position} active={active} />
       </section>
       <div className="control-column">

@@ -19,7 +19,7 @@ class FakeSource extends FakeNode {
 class FakeGain extends FakeNode { gain = new FakeParam(); }
 class FakeContext {
   currentTime = 0; state = 'running'; sampleRate = 100; destination = new FakeNode();
-  gains: FakeGain[] = []; sources: FakeSource[] = [];
+  gains: FakeGain[] = []; sources: FakeSource[] = []; convolvers: FakeNode[] = [];
   callbacks: (() => void)[] = [];
   resume = vi.fn(async () => { this.state = 'running'; });
   close = vi.fn(async () => { this.state = 'closed'; });
@@ -27,6 +27,7 @@ class FakeContext {
   createGain() { const node = new FakeGain(); this.gains.push(node); return node; }
   createOscillator() { const node = new FakeSource(); this.sources.push(node); return node; }
   createBufferSource() { return this.createOscillator(); }
+  createConvolver() { const node = new FakeNode(); this.convolvers.push(node); return node; }
   createBuffer(_channels: number, length: number) { return { getChannelData: () => new Float32Array(length) }; }
   createBiquadFilter() { return Object.assign(new FakeNode(), { frequency: new FakeParam(), type: '' }); }
 }
@@ -47,7 +48,7 @@ describe('audio-clock transport', () => {
     await Promise.all([transport.play(), transport.play()]);
     expect(context.resume).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(1);
-    expect(context.sources).toHaveLength(2);
+    expect(context.sources).toHaveLength(3);
     context.currentTime = 0.735;
     vi.advanceTimersByTime(25);
     expect(transport.getSnapshot().position).toBeCloseTo(0.7);
@@ -59,8 +60,8 @@ describe('audio-clock transport', () => {
     transport.seek(2);
     expect(transport.getSnapshot().position).toBe(2);
     await transport.play();
-    const newSources = context.sources.slice(2);
-    expect(newSources).toHaveLength(2);
+    const newSources = context.sources.slice(3);
+    expect(newSources).toHaveLength(3);
     expect(newSources.every(s => s.start.mock.calls[0][0] >= 10)).toBe(true);
     transport.dispose();
   });
@@ -71,7 +72,7 @@ describe('audio-clock transport', () => {
     context.currentTime = 0.535;
     transport.setSpeed(0.5);
     expect(transport.getSnapshot().position).toBeCloseTo(0.5);
-    expect(context.sources.at(-1)!.frequency.calls[0].value).toBe(pitch);
+    expect([...context.sources].reverse().find(s => !s.buffer && s.type === 'triangle')!.frequency.calls[0].value).toBe(pitch);
     expect(context.sources[0].stop.mock.calls.some(args => args.length === 0)).toBe(true);
     context.currentTime = 1.57;
     vi.advanceTimersByTime(25);
@@ -149,7 +150,7 @@ describe('audio-clock transport', () => {
     vi.advanceTimersByTime(25);
     expect(transport.readPosition()).toBeCloseTo(0);
     expect(context.sources.some(s => s.frequency.calls[0]?.value === 1000)).toBe(false); // skipped clicks aren't replayed
-    expect(context.sources.filter(s => s.start.mock.calls[0][0] === 2.035)).toHaveLength(3); // two parts and downbeat
+    expect(context.sources.filter(s => s.start.mock.calls[0][0] === 2.035)).toHaveLength(4); // pitched note, snare noise/body and downbeat
     transport.dispose();
   });
   it('maps input event timestamps to output time independently of the 25ms UI snapshot', async () => {
@@ -229,19 +230,44 @@ describe('audio-clock transport', () => {
     transport.dispose();
     expect(context.sources.every(s => s.stop.mock.calls.some(args => args.length === 0))).toBe(true);
   });
-  it('plays live drum taps as short noise bursts through the master despite muted backing', async () => {
+  it('plays live synthetic snare taps through the master despite muted backing', async () => {
     const { context, transport, score } = setup();
     const drum = score.parts[1];
     transport.setMix({ [drum.id]: { muted: true, solo: false } });
     await transport.play();
     transport.strike(drum.id, 38);
-    const tap = context.sources.at(-1)!;
+    const tap = context.sources.filter(s => s.buffer).at(-1)!;
     expect(tap.buffer).toBeDefined();
     expect(tap.frequency.calls).toHaveLength(0);
-    expect(tap.stop.mock.calls[0][0] - tap.start.mock.calls[0][0]).toBeCloseTo(0.17);
+    expect(tap.stop.mock.calls[0][0] - tap.start.mock.calls[0][0]).toBeCloseTo(0.19);
     expect(context.gains.at(-1)!.connect).toHaveBeenCalledWith(context.gains[0]);
     transport.dispose();
     expect(tap.stop).toHaveBeenCalledWith();
+  });
+  it('schedules four contacts per quaver with overlapping tails and cancels dry and wet output on pause', async () => {
+    const score = parseScore(synthetic([
+      measure(time() + tempo(120)),
+      measure('<Sticking><text>R</text></Sticking>' + chord('quarter', 38, '<TremoloSingleChord><subtype>r16</subtype></TremoloSingleChord>')),
+    ]), 'test');
+    const timeline = interpretScore(score);
+    const context = new FakeContext();
+    const transport = new Transport(timeline, () => context as unknown as AudioContext);
+    await transport.play();
+    expect(timeline.movements.map(m => m.hand)).toEqual(['R', 'L', 'R', 'L']);
+    expect(context.sources).toHaveLength(4);
+    context.sources.filter(s => s.buffer).forEach((source, i) => {
+      expect(source.buffer).toBeDefined();
+      expect(source.start.mock.calls[0][0]).toBeCloseTo(0.035 + i * 0.0625);
+    });
+    expect(context.sources[0].stop.mock.calls[0][0]).toBeGreaterThan(context.sources[2].start.mock.calls[0][0]);
+    context.currentTime = 0.135;
+    vi.advanceTimersByTime(25);
+    expect(context.sources).toHaveLength(8);
+    transport.pause();
+    expect(context.sources.every(s => s.stop.mock.calls.some(args => args.length === 0))).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(context.convolvers.every(node => node.disconnect.mock.calls.length > 0)).toBe(true);
+    transport.dispose();
   });
   it('skips muted challenge sources while retaining live taps, count-in and audible accompaniment', async () => {
     const { context, transport, score } = setup();
@@ -251,9 +277,9 @@ describe('audio-clock transport', () => {
     expect(context.sources).toHaveLength(1); // Count-in remains audible.
     context.currentTime = 2.035;
     vi.advanceTimersByTime(25);
-    expect(context.sources).toHaveLength(2); // Only the unmuted part is scheduled.
+    expect(context.sources).toHaveLength(3); // Only the unmuted part is scheduled.
     transport.strike(part.id, 60);
-    expect(context.sources).toHaveLength(3);
+    expect(context.sources).toHaveLength(4);
     expect(context.gains.at(-1)!.connect).toHaveBeenCalledWith(context.gains[0]);
     transport.dispose();
   });
@@ -261,10 +287,10 @@ describe('audio-clock transport', () => {
     const { context, transport, score } = setup();
     transport.setMix({ [score.parts[0].id]: { muted: true, solo: false } });
     await transport.play();
-    expect(context.sources).toHaveLength(2);
+    expect(context.sources).toHaveLength(3);
     transport.setMix({ [score.parts[0].id]: { muted: false, solo: false } });
     expect(context.gains[1].gain.value).toBe(1);
-    expect(context.sources).toHaveLength(2);
+    expect(context.sources).toHaveLength(3);
     transport.dispose();
   });
 });
