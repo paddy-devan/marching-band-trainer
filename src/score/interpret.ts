@@ -49,7 +49,8 @@ export function interpretScore(score: Score): Timeline {
     const length = chain.reduce((sum, n) => add(sum, n.duration), ZERO);
     const end = add(note.position, length);
     const marked = chain.some(n => n.tremolo);
-    const roll = marked && note.percussion && part.renderer === 'snare' && part.rollProfile !== 'disabled' && chain.every(n => !n.tremolo || ['r16', 'r32'].includes(n.tremolo));
+    const roll = marked && note.percussion && part.renderer === 'snare' && part.rollProfile !== 'disabled' && chain.every(n =>
+      !n.tremolo || ['r8', 'r16', 'r32'].includes(n.tremolo));
     if (marked && !roll) warn(`${part.name}: unsupported or disabled tremolo markings play as a single sustained event.`);
     const interval = roll ? rollInterval(score, note, part) : length;
     if (roll) {
