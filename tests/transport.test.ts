@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Transport } from '../src/audio/transport';
 import { interpretScore } from '../src/score/interpret';
 import { parseScore } from '../src/score/parser';
-import { chord, measure, synthetic, tempo, time } from './helpers';
+import { chord, fixture, measure, synthetic, tempo, time } from './helpers';
 
 class FakeParam {
   value = 0;
@@ -23,12 +23,16 @@ class FakeContext {
   callbacks: (() => void)[] = [];
   resume = vi.fn(async () => { this.state = 'running'; });
   close = vi.fn(async () => { this.state = 'closed'; });
+  decodeAudioData = vi.fn(async (_data: ArrayBuffer) => this.createBuffer(2, this.sampleRate * 11, this.sampleRate));
   addEventListener(_type: string, callback: () => void) { this.callbacks.push(callback); }
   createGain() { const node = new FakeGain(); this.gains.push(node); return node; }
   createOscillator() { const node = new FakeSource(); this.sources.push(node); return node; }
   createBufferSource() { return this.createOscillator(); }
   createConvolver() { const node = new FakeNode(); this.convolvers.push(node); return node; }
-  createBuffer(_channels: number, length: number) { return { getChannelData: () => new Float32Array(length) }; }
+  createBuffer(channels: number, length: number, rate: number) {
+    const data = Array.from({ length: channels }, () => new Float32Array(length));
+    return { duration: length / rate, numberOfChannels: channels, getChannelData: (channel: number) => data[channel] };
+  }
   createBiquadFilter() { return Object.assign(new FakeNode(), { frequency: new FakeParam(), type: '' }); }
 }
 function setup() {
@@ -41,8 +45,11 @@ function setup() {
   return { score, context, transport };
 }
 describe('audio-clock transport', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }));
+  });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
   it('starts once, derives position from the audio clock, and cancels stale sounds on pause/seek', async () => {
     const { context, transport } = setup();
     await Promise.all([transport.play(), transport.play()]);
@@ -243,6 +250,79 @@ describe('audio-clock transport', () => {
     expect(context.gains.at(-1)!.connect).toHaveBeenCalledWith(context.gains[0]);
     transport.dispose();
     expect(tap.stop).toHaveBeenCalledWith();
+  });
+  it.each(['heart-of-oak', 'a-life-on-the-ocean-wave', 'the-captain-general'])(
+    'routes the cymbal in %s to the loaded stereo recording with a speed-independent tail', async id => {
+      const score = fixture(id);
+      const cymbal = score.parts.find(p => /cymbal/i.test(p.name))!;
+      const timeline = interpretScore(score);
+      const firstCrash = timeline.movements.find(m => m.partId === cymbal.id)!;
+      const context = new FakeContext();
+      const transport = new Transport(timeline, () => context as unknown as AudioContext);
+      transport.seek(firstCrash.time);
+      await transport.play();
+      const crashes = () => context.sources.filter(s => (s.buffer as { numberOfChannels?: number } | undefined)?.numberOfChannels === 2);
+      const crash = crashes()[0];
+      expect(crash).toBeDefined();
+      expect(crash.buffer).toBe(await context.decodeAudioData.mock.results[0].value);
+      expect(crash.stop.mock.calls[0][0] - crash.start.mock.calls[0][0]).toBeCloseTo(11);
+      const bus = context.gains[1 + score.parts.indexOf(cymbal)];
+      const crashGain = crash.connect.mock.calls[0][0] as FakeGain;
+      expect(crashGain.connect).toHaveBeenCalledWith(bus);
+      transport.setMix({ [cymbal.id]: { muted: true, solo: false } });
+      expect(bus.gain.value).toBe(0);
+      transport.setMix({ [cymbal.id]: { muted: false, solo: true, volume: 0.4 } });
+      expect(bus.gain.value).toBe(0.4);
+      expect(context.gains.filter(g => g !== bus && g !== context.gains[0]).slice(0, score.parts.length - 1).every(g => g.gain.value === 0)).toBe(true);
+      transport.setSpeed(0.5);
+      const slowed = crashes().at(-1)!;
+      expect(slowed).not.toBe(crash);
+      expect(crash.stop).toHaveBeenCalledWith();
+      expect(slowed.buffer).toBe(crash.buffer);
+      expect(slowed.stop.mock.calls[0][0] - slowed.start.mock.calls[0][0]).toBeCloseTo(11);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
+      transport.pause();
+      expect(crashes().every(source => source.stop.mock.calls.some(args => args.length === 0))).toBe(true);
+      slowed.onended?.();
+      expect(slowed.disconnect).toHaveBeenCalled();
+      expect((slowed.connect.mock.calls[0][0] as FakeGain).disconnect).toHaveBeenCalled();
+      transport.dispose();
+    },
+  );
+  it('waits for sample decoding before starting the clock and honours pause during loading', async () => {
+    const timeline = interpretScore(fixture('heart-of-oak'));
+    const context = new FakeContext();
+    let resolve!: (buffer: ReturnType<FakeContext['createBuffer']>) => void;
+    context.decodeAudioData.mockImplementationOnce(() => new Promise(r => { resolve = r; }));
+    const transport = new Transport(timeline, () => context as unknown as AudioContext);
+    const started = transport.play();
+    await vi.waitFor(() => expect(context.decodeAudioData).toHaveBeenCalledTimes(1));
+    expect(transport.getSnapshot().playing).toBe(false);
+    expect(context.sources).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+    transport.pause();
+    resolve(context.createBuffer(2, 1100, 100));
+    await started;
+    expect(transport.getSnapshot().playing).toBe(false);
+    expect(context.sources).toHaveLength(0);
+    await transport.play();
+    expect(transport.getSnapshot().playing).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    transport.dispose();
+  });
+  it.each(['download', 'decode'] as const)('reports a sample %s failure and allows Play to retry', async failure => {
+    const context = new FakeContext();
+    if (failure === 'download') vi.mocked(fetch).mockResolvedValueOnce({ ok: false, status: 404 } as Response);
+    else context.decodeAudioData.mockRejectedValueOnce(new Error('Invalid audio'));
+    const transport = new Transport(interpretScore(fixture('heart-of-oak')), () => context as unknown as AudioContext);
+    await transport.play();
+    expect(transport.getSnapshot()).toMatchObject({ playing: false, status: expect.stringContaining('Cymbal sample could not load') });
+    expect(context.sources).toHaveLength(0);
+    await transport.play();
+    expect(transport.getSnapshot()).toMatchObject({ playing: true, status: undefined });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    transport.dispose();
   });
   it('schedules four contacts per quaver with overlapping tails and cancels dry and wet output on pause', async () => {
     const score = parseScore(synthetic([

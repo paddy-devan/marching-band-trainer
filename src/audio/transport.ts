@@ -2,6 +2,7 @@ import { audioContacts } from '../score/interpret';
 import type { Movement, Part, Timeline } from '../score/model';
 import { countIn, metronomeClicks, type Click } from './beats';
 import { SnareSynth } from './snare';
+import { CymbalSample } from './cymbal';
 
 export type Mix = Record<string, { muted: boolean; solo: boolean; volume?: number }>;
 export type TransportState = { playing: boolean; position: number; speed: number; status?: string };
@@ -33,16 +34,19 @@ export class Transport {
   private disposed = false;
   private state: TransportState = { playing: false, position: 0, speed: 1 };
   private snare?: SnareSynth;
+  private cymbal?: CymbalSample;
   private parts: Map<string, Part>;
   private clicks: Click[] = [];
   private nextClick = 0;
   private outputTiming = false;
   private skipMuted = false;
   private bassParts: Set<string>;
+  private cymbalParts: Set<string>;
 
   constructor(readonly timeline: Timeline, private createContext = () => new AudioContext()) {
     this.parts = new Map(timeline.score.parts.map(p => [p.id, p]));
     this.bassParts = new Set(timeline.score.parts.filter(p => /bass/i.test(p.name + p.instrument)).map(p => p.id));
+    this.cymbalParts = new Set(timeline.score.parts.filter(p => /cymbal/i.test(p.name + p.instrument)).map(p => p.id));
     this.contacts = timeline.movements.flatMap(movement => audioContacts(movement).map(c => ({ at: c.time, seconds: c.seconds, velocity: c.velocity, movement }))).sort((a, b) => a.at - b.at);
   }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
@@ -96,8 +100,10 @@ export class Transport {
     });
     this.updateGains();
     // Prepare procedural noise/room buffers before the first live strike.
-    if ([...this.parts.values()].some(p => p.percussion && !this.bassParts.has(p.id)))
+    if ([...this.parts.values()].some(p => p.percussion && !this.bassParts.has(p.id) && !this.cymbalParts.has(p.id)))
       this.snare = new SnareSynth(context, (source, nodes) => this.track(source, nodes));
+    if ([...this.parts.values()].some(p => p.percussion && this.cymbalParts.has(p.id)))
+      this.cymbal = new CymbalSample(context, (source, nodes) => this.track(source, nodes));
   }
   async play(options: PlayOptions = {}) {
     if (this.disposed || this.state.playing || this.starting) return;
@@ -106,6 +112,9 @@ export class Transport {
     try {
       this.setup();
       await this.context!.resume();
+      if (request !== this.revision || this.disposed) return;
+      // Resume within the user gesture, then load before anchoring the clock.
+      if (this.cymbal) await this.cymbal.load();
       if (request !== this.revision || this.disposed) return;
       if (this.context!.state !== 'running') throw new Error('Audio is suspended. Press Play again to resume.');
       this.outputTiming = options.outputTiming ?? false;
@@ -243,6 +252,10 @@ export class Transport {
     const part = this.parts.get(contact.movement.partId)!;
     const bus = this.buses.get(part.id)!;
     if (this.skipMuted && !output && bus.gain.value === 0) return;
+    if (contact.movement.percussion && this.cymbalParts.has(part.id)) {
+      this.cymbal!.strike(when, contact.velocity, output || bus);
+      return;
+    }
     if (contact.movement.percussion && !this.bassParts.has(part.id)) {
       this.snare!.strike(when, contact.velocity, output || bus);
       return;
