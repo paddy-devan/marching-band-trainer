@@ -186,12 +186,11 @@ Pitched audio uses decaying triangle oscillators, with a slightly longer ringing
 
 Verified native format: **MuseScore XML 4.70**, from the supplied `.mscz` fixtures. Other numeric 4.x versions are attempted with a warning; other major versions are rejected. Archive decoding follows `META-INF/container.xml`, then falls back only to a unique suitable root-level `.mscx`. Malformed or ambiguous archives are reported per file without preventing other scores from loading. Archive and selected XML size are limited to 20 MB.
 
-Supported: repeat barlines, repeat counts, nested repeats and multi-bar/multi-pass volta endings; standard durations through 1024ths, dots, full-measure rests, explicit pickup lengths, rests, chords, multiple voices and staffs, numeric tempo changes across parts, key/time-signature changes, native note pitch and `tpc` spelling, position-anchored single R/L sticking, named drum hands, accents, native next/prev tie locations, and the repertoire's single-chord snare rolls. Exact rational quarter-note units are retained until conversion through the shared tempo map.
+Supported: repeat barlines, repeat counts, nested repeats and multi-bar/multi-pass volta endings; standard durations through 1024ths, dots, tuplets (including nested groups, chords and rests), full-measure rests, explicit pickup lengths, rests, chords, multiple voices and staffs, numeric tempo changes across parts, key/time-signature changes, native note pitch and `tpc` spelling, position-anchored single R/L sticking, named drum hands, accents, native next/prev tie locations, and the repertoire's single-chord snare rolls. Tuplet ratios scale written durations exactly within each voice; malformed ratios or unmatched group boundaries are rejected. Exact rational quarter-note units are retained until conversion through the shared tempo map.
 
 Not yet faithfully interpreted:
 
 - Navigation jumps (D.C./D.S., Coda/Fine) and measure-repeat symbols are not expanded. Repeat barlines and volta endings are expanded before playback, including Colonel Bogey’s first and second endings.
-- Tuplets: detected and warned; ordinary written durations are used as an approximation.
 - Grace notes: detected and omitted.
 - Instrument changes, octave spanners and two-chord tremolos: detected and warned; stored pitches remain the playback source.
 - Compressed multimeasure rests, cross-measure voice locations and mid-bar time-signature changes: limited; warnings explain affected cases.
