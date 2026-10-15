@@ -95,7 +95,6 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
   const all = Array.from(node.getElementsByTagName('*'));
   if (all.some(e => ['Jump', 'Marker', 'RepeatMeasure'].includes(e.localName)))
     warn('Navigation jumps and measure-repeat symbols are not interpreted.');
-  if (all.some(e => e.localName === 'Tuplet')) warn('Tuplets are not interpreted yet; their written durations are approximate.');
   if (all.some(e => /grace|acciaccatura|appoggiatura/i.test(e.localName))) warn('Grace notes are omitted from playback.');
   if (all.some(e => ['InstrumentChange', 'Ottava', 'TremoloTwoChord', 'MeasureRepeat'].includes(e.localName) || (e.localName === 'Spanner' && e.getAttribute('type') === 'Ottava')))
     warn('Instrument changes, octave spanners, two-chord tremolos and measure repeats are not interpreted. Stored pitches play as written.');
@@ -137,11 +136,26 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
       const measure = measures[mi];
       children(measureNode, 'voice').forEach((voiceNode, vi) => {
         let cursor = ZERO;
+        // MuseScore 4 brackets tuplet members with Tuplet/endTuplet in each voice.
+        // Store cumulative ratios so nested tuplets scale notes and rests exactly.
+        const tuplets: Fraction[] = [];
         const sticking = new Map<string, Hand>();
         const voiceNotes: WrittenNote[] = [];
         for (const el of Array.from(voiceNode.children)) {
           const at = add(measure.start, cursor);
           switch (el.localName) {
+            case 'Tuplet': {
+              const actual = number(el, 'actualNotes');
+              const normal = number(el, 'normalNotes');
+              if (!Number.isSafeInteger(actual) || actual <= 0 || !Number.isSafeInteger(normal) || normal <= 0)
+                throw new Error(`${part.name}, bar ${mi + 1}: invalid tuplet ratio.`);
+              tuplets.push(mul(tuplets.at(-1) || fraction(1), fraction(normal, actual)));
+              break;
+            }
+            case 'endTuplet': {
+              if (!tuplets.pop()) throw new Error(`${part.name}, bar ${mi + 1}: tuplet end has no matching start.`);
+              break;
+            }
             case 'location': {
               if (text(el, 'fractions')) cursor = add(cursor, nativeFraction(text(el, 'fractions')));
               if (number(el, 'measures')) warn(`${part.name}: cross-measure voice locations are unsupported.`);
@@ -184,7 +198,7 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
             case 'Chord':
             case 'Rest': {
               if (Array.from(el.children).some(c => /grace|acciaccatura|appoggiatura/i.test(c.localName))) break;
-              const length = duration(el, measure);
+              const length = mul(duration(el, measure), tuplets.at(-1) || fraction(1));
               if (el.localName === 'Rest') rests.push({ partId: part.id, position: at, duration: length, voice: vi });
               else {
                 const tremolo = child(el, 'TremoloSingleChord');
@@ -213,6 +227,7 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
             }
           }
         }
+        if (tuplets.length) throw new Error(`${part.name}, bar ${mi + 1}: tuplet is missing its end.`);
         if (compare(cursor, measure.duration) > 0) warn(`${part.name}, bar ${mi + 1}: voice exceeds the measure; playback may overlap the next bar.`);
         for (const n of voiceNotes) {
           if (!n.percussion) continue;

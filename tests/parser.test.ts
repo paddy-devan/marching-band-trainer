@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fraction, value } from '../src/score/fraction';
+import { add, fraction, sub, value } from '../src/score/fraction';
 import { pitchLabel, keyLabel } from '../src/score/labels';
 import { parseScore } from '../src/score/parser';
 import { chord, fixture, measure, synthetic, tempo, time } from './helpers';
@@ -55,6 +55,23 @@ describe('actual source scores', () => {
     expect(score.tempos[0].bpm).toBe(174);
     expect(value(score.duration)).toBe(108);
   });
+  it('fits Sarie Marais bar 9 triplets and their rest into two beats', () => {
+    const score = fixture('sarie-marais');
+    const drum = score.parts.find(p => p.name === 'Side Drum')!;
+    const bar = score.measures[8];
+    const notes = score.notes.filter(n => n.partId === drum.id && n.measure === 8);
+    expect(bar.signature).toEqual({ numerator: 4, denominator: 4 });
+    expect(notes.map(n => n.offset)).toEqual([
+      fraction(0), fraction(2, 3), fraction(1), fraction(4, 3), fraction(5, 3), fraction(2), fraction(3),
+    ]);
+    expect(notes.map(n => n.duration)).toEqual([
+      ...Array.from({ length: 5 }, () => fraction(1, 3)), fraction(1), fraction(1),
+    ]);
+    const rest = score.rests.find(r => r.partId === drum.id && value(sub(r.position, bar.start)) === 1 / 3)!;
+    expect(rest.duration).toEqual(fraction(1, 3));
+    expect(add(notes.at(-1)!.position, notes.at(-1)!.duration)).toEqual(add(bar.start, bar.duration));
+    expect(score.warnings.some(w => /tuplet|exceeds the measure/i.test(w))).toBe(false);
+  });
 });
 
 describe('notation and validation', () => {
@@ -79,9 +96,8 @@ describe('notation and validation', () => {
     expect(score.warnings.some(w => /matched 0 parts/.test(w))).toBe(true);
   });
   it('detects unsupported notation instead of claiming faithful playback', () => {
-    const score = parseScore(synthetic([measure(time() + tempo(120) + '<Tuplet><actualNotes>3</actualNotes></Tuplet>' + chord('eighth', 60, '<acciaccatura/>') + chord())]), 'test');
+    const score = parseScore(synthetic([measure(time() + tempo(120) + chord('eighth', 60, '<acciaccatura/>') + chord())]), 'test');
     expect(score.notes).toHaveLength(1);
-    expect(score.warnings.some(w => /Tuplets/.test(w))).toBe(true);
     expect(score.warnings.some(w => /Grace notes/.test(w))).toBe(true);
   });
   it('keeps nested visible text as plain text and rejects malformed formats', () => {
