@@ -14,6 +14,8 @@ type SoundSource = AudioScheduledSourceNode;
 // Device reports can be invalid on Firefox Android. Allow even slow wireless
 // output, but never let an unbounded/negative delay freeze the challenge clock.
 const MAX_OUTPUT_DELAY = 2;
+// Apply after score velocity clamping so accents remain distinct at louder dynamics.
+const DRUM_ACCENT_GAIN = 1.6;
 function deviceLatency(delay: number | undefined) {
   return typeof delay === 'number' && Number.isFinite(delay) && delay >= 0 && delay <= MAX_OUTPUT_DELAY ? delay : 0;
 }
@@ -176,6 +178,9 @@ export class Transport {
     this.snare?.clearReverb();
   }
   private reanchor(position: number) {
+    // Give an opening flam its pre-beat stroke, including on restart. Other
+    // seeks still omit attacks before the requested point.
+    if (position === 0 && this.contacts[0]?.at < 0) position = this.contacts[0].at;
     this.anchorPosition = position;
     this.anchorTime = this.context!.currentTime + 0.035;
     this.next = this.contacts.findIndex(c => c.at >= position - 1e-8);
@@ -259,8 +264,9 @@ export class Transport {
       this.cymbal!.strike(when, contact.velocity, output || bus, output ? undefined : contact.seconds / this.state.speed);
       return;
     }
+    const velocity = contact.velocity * (contact.movement.percussion && contact.movement.accent ? DRUM_ACCENT_GAIN : 1);
     if (contact.movement.percussion && !this.bassParts.has(part.id)) {
-      this.snare!.strike(when, contact.velocity, output || bus);
+      this.snare!.strike(when, velocity, output || bus);
       return;
     }
     if (part.renderer === 'lyre' && !contact.movement.percussion) {
@@ -272,7 +278,7 @@ export class Transport {
     const gain = ctx.createGain();
     gain.connect(output || bus);
     gain.gain.setValueAtTime(0.0001, when);
-    gain.gain.linearRampToValueAtTime(contact.velocity * (contact.movement.percussion ? 0.65 : 0.45), when + 0.003);
+    gain.gain.linearRampToValueAtTime(velocity * (contact.movement.percussion ? 0.65 : 0.45), when + 0.003);
     const decay = contact.movement.percussion ? Math.min(length, 0.16) : length;
     gain.gain.exponentialRampToValueAtTime(0.0001, when + decay);
     const osc = ctx.createOscillator();

@@ -49,7 +49,7 @@ export class ChallengeFrames {
     }
     const measure = this.measures[low - 1];
     const bar = (measure && beats < measure.end ? measure : this.measures.at(-1))?.bar ?? 1;
-    const count = position < 0 ? Math.min(this.leadIn.beats, Math.floor((position + this.leadIn.duration) / this.leadIn.interval) + 1) : 0;
+    const count = position < Math.min(0, this.targets[0]?.time ?? 0) ? Math.min(this.leadIn.beats, Math.floor((position + this.leadIn.duration) / this.leadIn.interval) + 1) : 0;
     const visibleFeedback = feedback && (position - feedback.at) / this.speed < 0.4 ? feedback : undefined;
     const perfectStreak = attempt?.perfectStreak().current ?? 0;
     const cuePitches = this.cuePitches;

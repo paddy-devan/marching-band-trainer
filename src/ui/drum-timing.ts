@@ -63,6 +63,8 @@ function ease(n: number) {
   const t = Math.max(0, Math.min(1, n));
   return t * t * (3 - 2 * t);
 }
+const SHALLOW_LIFT = 8 / 19.5;
+const ACCENT_EXTRA_LIFT = 20;
 
 function rollContact(previous: DrumGesture, next: DrumGesture | undefined, elapsed: number, speed: number, timing: DrumTiming) {
   const press = previous.seconds / speed;
@@ -70,7 +72,7 @@ function rollContact(previous: DrumGesture, next: DrumGesture | undefined, elaps
   const end = previous.rollEnd ?? previous.time + previous.seconds;
   const run = (end - previous.time) / speed;
   const rebound = timing.rebound / 1000;
-  const lift = 8 / 19.5; // Eight degrees of recovery, about two fifths of a normal lift.
+  const lift = SHALLOW_LIFT; // Eight degrees of recovery, about two fifths of a normal lift.
   if (next?.roll && next.time <= end + 1e-8) {
     const gap = (next.time - previous.time) / speed;
     // Adjoining same-hand notes need a little recovery within the last contact
@@ -86,6 +88,13 @@ function rollContact(previous: DrumGesture, next: DrumGesture | undefined, elaps
   }
   if (elapsed < press) {
     return 1 - 0.035 * Math.sin(Math.PI * Math.max(0, elapsed / interval)) ** 2;
+  }
+  if (next?.accent && !next.roll && next.flam !== 'grace') {
+    // An accented release needs a full lift once this hand's final press ends,
+    // even while the other hand finishes the roll.
+    const gap = (next.time - previous.time) / speed;
+    const rise = Math.min(rebound, Math.max(0.001, gap - press - timing.downstroke / 1000));
+    return 1 - ease((elapsed - press) / rise);
   }
   // Once this hand's final press finishes, relax a little while the other hand
   // finishes the passage. The full rebound starts at the end of the run.
@@ -113,7 +122,25 @@ export function drumFrame(lanes: DrumGesture[][], position: number, speed: numbe
     const rollHandover = previous?.roll && next?.roll && next.time <= (previous.rollEnd ?? previous.time + previous.seconds) + 1e-8;
     // rollContact already supplies the shallow return to the head. A normal
     // downstroke here would override that recovery just before the next press.
-    if (next && !rollHandover) contact = Math.max(contact, ease(1 - (next.time - at) / speed / downstroke));
+    if (next && !rollHandover) {
+      if (next.flam === 'grace') {
+        // Settle close to the head first, then use the same eight-degree lift
+        // as a roll recovery for the quiet grace stroke's short downstroke.
+        const preparation = Math.min(0.12, gap * 0.4);
+        const fall = Math.min(0.025, preparation / 2);
+        const until = (next.time - at) / speed;
+        const ready = (1 - SHALLOW_LIFT) * ease((preparation - until) / (preparation - fall));
+        contact = Math.max(contact, ready + SHALLOW_LIFT * ease(1 - until / fall));
+      } else contact = Math.max(contact, ease(1 - (next.time - at) / speed / downstroke));
+    }
+    let extraLift = 0;
+    if (next?.accent && next.flam !== 'grace' && !rollHandover) {
+      const until = (next.time - at) / speed;
+      const preparation = Math.min(downstroke + 0.12, gap * 0.6);
+      const lift = ease((preparation - until) / (preparation - downstroke)) * (1 - ease(1 - until / downstroke));
+      // Never pull a stick away from a current contact to prepare the next hit.
+      extraLift = ACCENT_EXTRA_LIFT * Math.min(1 - contact, lift);
+    }
     const effect = (offset: number, duration: number, rollOnly = false) => {
       const effectAt = shifted(offset);
       const { previous, next } = neighbours(notes, effectAt);
@@ -121,6 +148,6 @@ export function drumFrame(lanes: DrumGesture[][], position: number, speed: numbe
       const length = Math.min(duration / 1000, next ? (next.time - previous.time) / speed * 0.85 : Infinity);
       return (effectAt - previous.time) / speed < length - 1e-8;
     };
-    return { angle: 28 + 19.5 * contact, impact: effect(timing.impactOffset, timing.impactDuration), buzz: effect(timing.buzzOffset, timing.buzzDuration, true) };
+    return { angle: 28 + 19.5 * contact - extraLift, impact: effect(timing.impactOffset, timing.impactDuration), buzz: effect(timing.buzzOffset, timing.buzzDuration, true) };
   });
 }

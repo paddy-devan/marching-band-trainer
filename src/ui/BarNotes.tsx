@@ -13,6 +13,7 @@ export function barCues(score: Score, movements: Movement[], measure: Measure): 
   const end = secondsAt(score, add(measure.start, measure.duration));
   const groups: NoteCue[] = [];
   for (const m of movements) {
+    if (m.flam === 'grace') continue; // The principal cue labels the complete flam.
     if (m.time >= end - 1e-8 || m.time + m.seconds <= start + 1e-8) continue;
     const at = Math.max(m.time, start);
     const until = Math.min(m.time + m.seconds, end);

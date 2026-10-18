@@ -77,6 +77,7 @@ export function Challenge({ timeline, mode, onExit }: { timeline: Timeline; mode
   const started = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const targets = useMemo(() => part ? (drum ? drumTargets : gameTargets)(timeline, part, settings.speed) : [], [timeline, part, settings.speed, drum]);
+  const firstAttack = Math.min(0, targets[0]?.time ?? 0);
   const leadIn = useMemo(() => countIn(timeline), [timeline]);
   const frames = useMemo(() => new ChallengeFrames(timeline, targets, settings.speed, drum, settings.preview), [timeline, targets, settings.speed, drum, settings.preview]);
   const [view, setView] = useState(() => frames.read(0));
@@ -117,7 +118,7 @@ export function Challenge({ timeline, mode, onExit }: { timeline: Timeline; mode
         const state = transport.getSnapshot();
         const at = transport.readPosition();
         position.current = at;
-        if (at >= 0) attempt.current?.advance(at);
+        if (at >= firstAttack) attempt.current?.advance(at);
         drumAnimation.current?.update(at);
         // Progress is informational; it need not trigger layout on every frame.
         const now = performance.now();
@@ -142,7 +143,7 @@ export function Challenge({ timeline, mode, onExit }: { timeline: Timeline; mode
     document.addEventListener('visibilitychange', interrupt);
     return () => { cancelAnimationFrame(frame); document.removeEventListener('visibilitychange', interrupt); };
   // Settings cannot change during an attempt; the transport and timeline are stable.
-  }, [phase, transport, timeline, publish]);
+  }, [phase, transport, timeline, publish, firstAttack]);
 
   const start = async () => {
     if (!part || phaseRef.current !== 'setup') return;
@@ -172,12 +173,12 @@ export function Challenge({ timeline, mode, onExit }: { timeline: Timeline; mode
     const pitch = typeof strike === 'number' ? strike : drumPitches[strike];
     if (pitch === undefined) return;
     transport.strike(part.id, pitch);
-    // Count-in taps are free. Clock conversion can put an exact first attack a
-    // fraction of a nanosecond below zero; treat that as the score boundary.
-    const text = at < -1e-8 ? '' : attempt.current!.tap(strike, Math.max(0, at));
+    // Count-in taps are free until the first attack, which can be a flam's
+    // pre-beat grace stroke. Preserve its negative timestamp when scoring.
+    const text = at < firstAttack - 1e-8 ? '' : attempt.current!.tap(strike, Math.max(firstAttack, at));
     feedback.current = { strike, text, at };
     publish(position.current);
-  }, [transport, part, drumPitches, publish]);
+  }, [transport, part, drumPitches, publish, firstAttack]);
 
   if (!part) return <main className="challenge"><div className="game-card"><h1>{title} unavailable</h1><p>{drum ? 'This piece needs a side or snare drum part with playable notes.' : 'This piece needs a bell lyre part with notes inside its playable range.'}</p><button onClick={onExit}>Back to score</button></div></main>;
   const { cuePitches, feedback: visibleFeedback, perfectStreak, count } = view;

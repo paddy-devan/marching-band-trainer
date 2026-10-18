@@ -9,6 +9,51 @@ const note = (change: Partial<Movement> = {}): Movement => ({
 });
 
 describe('drum animation timing', () => {
+  it.each([0.25, 1, 1.5])('prepares accented hits higher and still contacts on the beat at %s speed', speed => {
+    const ordinary = drumLanes([note(), note({ time: 2 })]);
+    const accented = drumLanes([note(), note({ time: 2, accent: true })]);
+    const at = 2 - 0.065 * speed;
+    expect(drumFrame(ordinary, at, speed, defaults)[0].angle).toBe(28);
+    expect(drumFrame(accented, at, speed, defaults)[0].angle).toBeCloseTo(8);
+    expect(drumFrame(accented, 2, speed, defaults)[0]).toEqual({ angle: 47.5, impact: true, buzz: false });
+    expect(drumFrame(accented, 2 + 0.11 * speed, speed, defaults)[0].angle).toBe(28);
+    const shifted = { ...defaults, visualOffset: 100, stickOffset: -50 };
+    expect(drumFrame(accented, at + 0.05 * speed, speed, shifted)[0].angle).toBeCloseTo(8);
+    drumFrame(accented, 20, speed, defaults);
+    expect(drumFrame(accented, at, speed, defaults)[0].angle).toBeCloseTo(8);
+  });
+  it('lifts out of a roll for an accented release while continuous rolls keep their shallow motion', () => {
+    const movements = [note({ roll: true, seconds: 0.1 }), note({ time: 1.1, hand: 'R', roll: true, seconds: 0.1 }), note({ time: 1.2, accent: true })];
+    const lanes = drumLanes(movements);
+    expect(drumFrame(lanes, 1.135, 1, defaults)[0].angle).toBeCloseTo(8);
+    expect(drumFrame(lanes, 1.2, 1, defaults)[0]).toMatchObject({ angle: 47.5, impact: true, buzz: false });
+    const rolls = drumLanes(movements.map(m => ({ ...m, roll: true, accent: true })));
+    for (let at = 1; at < 1.3; at += 0.001) {
+      expect(drumFrame(rolls, at, 1, defaults)[0].angle).toBeGreaterThanOrEqual(39.5 - 1e-8);
+    }
+  });
+  it('keeps grace notes low even if an accent flag is present, and bounds dense accent gestures', () => {
+    const grace = drumLanes([note({ flam: 'grace', accent: true })]);
+    expect(drumFrame(grace, 0.975, 1, defaults)[0].angle).toBeCloseTo(39.5);
+    const dense = drumLanes([note(), note({ time: 1.04, accent: true }), note({ time: 1.08 })]);
+    for (let at = 0.8; at < 1.5; at += 0.001) {
+      const { angle } = drumFrame(dense, at, 1.5, defaults)[0];
+      expect(angle).toBeGreaterThanOrEqual(8 - 1e-8);
+      expect(angle).toBeLessThanOrEqual(47.5);
+    }
+  });
+  it('prepares a flam grace stroke close to the head with an eight-degree downstroke', () => {
+    const lanes = drumLanes([note({ flam: 'grace', seconds: 0.035 }), note({ id: 'main', time: 1.035, hand: 'R', flam: 'main' })]);
+    for (const speed of [0.25, 1, 1.5]) {
+      const frame = (at: number) => drumFrame(lanes, at, speed, defaults);
+      expect(frame(1 - 0.025 * speed)[0].angle).toBeCloseTo(39.5);
+      expect(frame(1 - 0.0125 * speed)[0].angle).toBeCloseTo(43.5);
+      expect(frame(1)[0]).toMatchObject({ angle: 47.5, impact: true, buzz: false });
+      // The opposite hand retains its full-height preparation for the main hit.
+      expect(frame(1.035 - 0.065 * speed)[1].angle).toBe(28);
+      expect(frame(1.035)[1]).toMatchObject({ angle: 47.5, impact: true, buzz: false });
+    }
+  });
   it('approaches the head before the attack, contacts on the attack, and rebounds afterwards', () => {
     const lanes = drumLanes([note()]);
     const frame = (at: number) => drumFrame(lanes, at, 1, defaults)[0];
