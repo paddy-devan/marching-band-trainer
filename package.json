@@ -38,8 +38,6 @@
     "wrangler": "^4.148.0"
   },
   "overrides": {
-    "miniflare": {
-      "sharp": "^0.35.5"
-    }
+    "sharp": "^0.35.5"
   }
 }
