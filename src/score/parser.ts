@@ -3,6 +3,7 @@ import { applyConfig, type TrainerConfig } from './config';
 import type { Hand, Measure, Part, Score, Signature, TieLocation, WrittenNote } from './model';
 import { child, children, number, parseXml, text } from './xml';
 import { readRepeats } from './repeats';
+import { applyDynamics, dynamicVelocities } from './dynamics';
 
 const slug = (name: string) => name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'part';
 const durations: Record<string, Fraction> = {
@@ -125,6 +126,7 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
   const notes: WrittenNote[] = [];
   const rests: Score['rests'] = [];
   const tempos: Score['tempos'] = [];
+  const dynamics: Score['dynamics'] = [];
   const keys: Score['keys'] = [];
   staffs.forEach((staff, staffIndex) => {
     const sid = staffIds[staffIndex];
@@ -183,6 +185,17 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
               else if (Math.abs(existing.bpm - bpm) > 0.01) warn(`Bar ${mi + 1}: conflicting tempo marks; using the first.`);
               break;
             }
+            case 'Dynamic': {
+              const subtype = text(el, 'subtype');
+              const saved = number(el, 'velocity');
+              const nominal = dynamicVelocities[subtype];
+              if (nominal === undefined) warn(`${part.name}: dynamic “${subtype}” is unsupported; using the previous level.`);
+              else {
+                const midi = Number.isInteger(saved) && saved > 0 && saved <= 127 ? saved : nominal;
+                dynamics.push({ partId: part.id, position: at, velocity: midi / 127 });
+              }
+              break;
+            }
             case 'KeySig': {
               if (!percussion) {
                 const fifths = number(el, 'concertKey', number(el, 'accidental'));
@@ -215,7 +228,7 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
                     voice: vi, measure: mi, offset: cursor, position: at, duration: length, pitch,
                     tpc: text(n, 'tpc') ? number(n, 'tpc') : undefined, percussion,
                     provenance: 'unknown', tremolo: tremolo ? text(tremolo, 'subtype') : undefined,
-                    velocity: accent ? 1 : 0.72,
+                    velocity: accent ? 1 : 0.72, accent,
                     tieNext: location(nextTie && child(nextTie, 'next')), tiePrev: location(previousTie && child(previousTie, 'prev')),
                   };
                   voiceNotes.push(note);
@@ -244,6 +257,8 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
   });
   notes.sort((a, b) => compare(a.position, b.position));
   tempos.sort((a, b) => compare(a.position, b.position));
+  dynamics.sort((a, b) => compare(a.position, b.position));
+  applyDynamics(notes, dynamics);
   if (!tempos.length || compare(tempos[0].position, ZERO) > 0) {
     tempos.unshift({ position: ZERO, bpm: 120 });
     warn('No initial playback tempo was found; using 120 BPM until the first tempo mark.');
@@ -276,5 +291,5 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
     if (missing) warn(`${part.name}: ${missing} written notes have unspecified sticking. Neutral strikes are shown; no hand is invented.`);
   }
   const end = notes.reduce((max, n) => compare(add(n.position, n.duration), max) > 0 ? add(n.position, n.duration) : max, position);
-  return { id, version, title, composer, parts, measures, notes, rests, ties, tempos, keys, signatures, warnings, duration: end, repeats, endings };
+  return { id, version, title, composer, parts, measures, notes, rests, ties, tempos, dynamics, keys, signatures, warnings, duration: end, repeats, endings };
 }

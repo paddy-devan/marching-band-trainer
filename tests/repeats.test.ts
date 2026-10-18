@@ -67,6 +67,16 @@ describe('repeat and ending playback', () => {
     expect(expanded.tempos.map(t => [value(t.position), t.bpm])).toEqual([[0, 120], [4, 60], [8, 120]]);
     expect(secondsAt(expanded, expanded.duration)).toBe(10);
   });
+  it('restores dynamics on repeat returns and excludes marks in skipped endings', () => {
+    const mp = '<Dynamic><subtype>mp</subtype></Dynamic>';
+    const ff = '<Dynamic><subtype>ff</subtype></Dynamic>';
+    const source = parse(bar(60, time() + tempo(120) + mp) + bar(61, start) +
+      bar(62, volta('1') + ff + end()) + bar(63, volta('2')));
+    const timeline = interpretScore(source);
+    expect(timeline.movements.map(m => m.velocity)).toEqual([64 / 127, 64 / 127, 112 / 127, 64 / 127, 64 / 127]);
+    // Expansion does not change the written score's dynamics.
+    expect(source.notes.at(-1)?.velocity).toBe(112 / 127);
+  });
   it('preserves ties inside each pass and breaks a tie across a repeat jump', () => {
     const next = '<Spanner type="Tie"><next><location><measures>1</measures></location></next></Spanner>';
     const prev = '<Spanner type="Tie"><prev><location><measures>-1</measures></location></prev></Spanner>';

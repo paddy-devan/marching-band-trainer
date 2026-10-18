@@ -253,7 +253,7 @@ export class Transport {
     const bus = this.buses.get(part.id)!;
     if (this.skipMuted && !output && bus.gain.value === 0) return;
     if (contact.movement.percussion && this.cymbalParts.has(part.id)) {
-      this.cymbal!.strike(when, contact.velocity, output || bus);
+      this.cymbal!.strike(when, contact.velocity, output || bus, output ? undefined : contact.seconds / this.state.speed);
       return;
     }
     if (contact.movement.percussion && !this.bassParts.has(part.id)) {

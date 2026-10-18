@@ -4,6 +4,41 @@ import { pitchLabel, keyLabel } from '../src/score/labels';
 import { parseScore } from '../src/score/parser';
 import { chord, fixture, measure, synthetic, tempo, time } from './helpers';
 
+describe('written dynamics', () => {
+  const dynamic = (name: string, velocity = 0) => `<Dynamic><subtype>${name}</subtype><velocity>${velocity}</velocity></Dynamic>`;
+  it('carries part dynamics through rests and bars, respects saved velocities, and keeps accents relative', () => {
+    const bars = measure(time() + tempo(120) + chord() + dynamic('pp') + chord() +
+      dynamic('mp') + chord('quarter', 60, '<Articulation><subtype>articAccentAbove</subtype></Articulation>') + chord()) +
+      measure('<Rest><durationType>quarter</durationType></Rest>' + chord() + dynamic('pp', 49) + chord('half'));
+    const score = parseScore(synthetic([bars, measure(chord('whole', 38)) + measure(chord('whole', 38))]), 'dynamics');
+    expect(score.notes.filter(n => n.partId === score.parts[0].id).map(n => n.velocity)).toEqual([
+      0.72, 33 / 127, 64 / 127 / 0.72, 64 / 127, 64 / 127, 49 / 127,
+    ].map(value => expect.closeTo(value, 8)));
+    expect(score.notes.filter(n => n.partId === score.parts[1].id).every(n => n.velocity === 0.72)).toBe(true);
+  });
+  it('applies a dynamic to simultaneous notes in another voice regardless of XML traversal order', () => {
+    const bars = `<Measure><voice>${time()}${tempo(120)}${chord('half')}${chord('half')}</voice>` +
+      `<voice>${dynamic('pp')}${chord('half', 67)}${dynamic('f')}${chord('half', 67)}</voice></Measure>`;
+    const score = parseScore(synthetic([bars]), 'voices');
+    expect(score.notes.filter(n => value(n.position) === 0).map(n => n.velocity)).toEqual([33 / 127, 33 / 127]);
+    expect(score.notes.filter(n => value(n.position) === 2).map(n => n.velocity)).toEqual([96 / 127, 96 / 127]);
+  });
+  it('reads the Captain General cymbal levels and saved pp overrides', () => {
+    const score = fixture('the-captain-general');
+    const part = score.parts.find(p => /cymbal/i.test(p.name))!;
+    const notes = score.notes.filter(n => n.partId === part.id);
+    expect(notes.find(n => n.measure === 0)?.velocity).toBeCloseTo(64 / 127);
+    expect(notes.find(n => n.measure === 3)?.velocity).toBeCloseTo(49 / 127);
+    expect(notes.find(n => n.measure === 4)?.velocity).toBeCloseTo(64 / 127 / 0.72);
+    expect(notes.some(n => Math.abs(n.velocity - 33 / 127) < 1e-6)).toBe(true);
+  });
+  it('does not turn an unsupported special attack into a persistent dynamic', () => {
+    const score = parseScore(synthetic([measure(time() + tempo(120) + dynamic('pp') + chord() + dynamic('sfz', 112) + chord('half'))]), 'special');
+    expect(score.notes.map(n => n.velocity)).toEqual([33 / 127, 33 / 127]);
+    expect(score.warnings.some(w => /sfz.*unsupported/.test(w))).toBe(true);
+  });
+});
+
 describe('actual source scores', () => {
   it('uses visible titles and accurately resolves every 16 OBR hand', () => {
     const score = fixture('16obr');

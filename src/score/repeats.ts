@@ -1,6 +1,7 @@
 import { add, compare, nativeFraction, sub, ZERO } from './fraction';
 import type { Ending, Repeat, Score, WrittenNote } from './model';
 import { child, number, text } from './xml';
+import { applyDynamics } from './dynamics';
 
 // MuseScore repeat signs are measure properties; volta spanners end at an
 // exclusive measure boundary (or inside the final included measure).
@@ -80,6 +81,7 @@ export function expandRepeats(score: Score): Score {
   const rests: Score['rests'] = [];
   const measures: Score['measures'] = [];
   const tempos: Score['tempos'] = [];
+  const dynamics: Score['dynamics'] = [];
   const keys: Score['keys'] = [];
   const signatures: Score['signatures'] = [];
   const visits: Map<string, WrittenNote>[] = [];
@@ -96,6 +98,10 @@ export function expandRepeats(score: Score): Score {
     if (reset) {
       const tempo = score.tempos.filter(t => compare(t.position, source.start) <= 0).at(-1)!;
       if (!tempos.length || tempos.at(-1)!.bpm !== tempo.bpm) tempos.push({ position: start, bpm: tempo.bpm });
+      for (const partId of new Set(score.dynamics.map(d => d.partId))) {
+        const dynamic = score.dynamics.filter(d => d.partId === partId && compare(d.position, source.start) <= 0).at(-1);
+        dynamics.push({ partId, position: start, velocity: dynamic?.velocity ?? 0.72 });
+      }
       for (const part of score.parts.filter(p => !p.percussion && score.keys.some(k => k.partId === p.id))) {
         const key = score.keys.filter(k => k.partId === part.id && compare(k.position, source.start) <= 0).at(-1);
         // No written key mark means C at the start of the piece.
@@ -107,6 +113,7 @@ export function expandRepeats(score: Score): Score {
       if (tempos.at(-1)?.bpm !== t.bpm) tempos.push({ ...t, position });
     }
     for (const k of score.keys.filter(k => compare(k.position, source.start) >= 0 && compare(k.position, end) < 0)) keys.push({ ...k, position: translate(k.position) });
+    for (const d of score.dynamics.filter(d => compare(d.position, source.start) >= 0 && compare(d.position, end) < 0)) dynamics.push({ ...d, position: translate(d.position) });
     const visit = new Map<string, WrittenNote>();
     for (const n of writtenNotes[sourceIndex]) {
       if (notes.length >= 200000) throw new Error('Repeat expansion exceeds 200,000 notes.');
@@ -132,5 +139,6 @@ export function expandRepeats(score: Score): Score {
     if (to && compare(add(from.position, from.duration), to.position) === 0) ties.push({ from: from.id, to: to.id });
   }
   const duration = notes.reduce((end, n) => compare(add(n.position, n.duration), end) > 0 ? add(n.position, n.duration) : end, start);
-  return { ...score, measures, notes, rests, ties, tempos, keys, signatures, duration, writtenMeasureCount: score.measures.length, repeats: [], endings: [] };
+  applyDynamics(notes, dynamics);
+  return { ...score, measures, notes, rests, ties, tempos, dynamics, keys, signatures, duration, writtenMeasureCount: score.measures.length, repeats: [], endings: [] };
 }
