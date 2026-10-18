@@ -265,7 +265,8 @@ describe('audio-clock transport', () => {
       const crash = crashes()[0];
       expect(crash).toBeDefined();
       expect(crash.buffer).toBe(await context.decodeAudioData.mock.results[0].value);
-      expect(crash.stop.mock.calls[0][0] - crash.start.mock.calls[0][0]).toBeCloseTo(11);
+      expect(crash.start).toHaveBeenCalledWith(0.035, 0.03);
+      expect(crash.stop.mock.calls[0][0] - crash.start.mock.calls[0][0]).toBeCloseTo(10.97);
       const bus = context.gains[1 + score.parts.indexOf(cymbal)];
       const crashGain = crash.connect.mock.calls[0][0] as FakeGain;
       expect(crashGain.connect).toHaveBeenCalledWith(bus);
@@ -279,7 +280,8 @@ describe('audio-clock transport', () => {
       expect(slowed).not.toBe(crash);
       expect(crash.stop).toHaveBeenCalledWith();
       expect(slowed.buffer).toBe(crash.buffer);
-      expect(slowed.stop.mock.calls[0][0] - slowed.start.mock.calls[0][0]).toBeCloseTo(11);
+      expect(slowed.start.mock.calls[0][1]).toBe(0.03);
+      expect(slowed.stop.mock.calls[0][0] - slowed.start.mock.calls[0][0]).toBeCloseTo(10.97);
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
       transport.pause();
