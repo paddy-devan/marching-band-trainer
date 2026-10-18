@@ -103,11 +103,12 @@ describe('audio-clock transport', () => {
     expect(transport.getSnapshot().position).toBe(0);
     transport.dispose();
   });
-  it('adds a modest ringing tail to bell lyre notes and still stops them on pause', async () => {
+  it('gives lyre notes a metal-bar spectrum and ringing tail, with every mode cancelled on pause', async () => {
     const score = parseScore(synthetic([measure(time() + tempo(120) + chord())]), 'test');
     const ring = async (lyre: boolean) => {
       score.parts[0].renderer = lyre ? 'lyre' : 'pulse';
       const context = new FakeContext();
+      context.sampleRate = 44100;
       const transport = new Transport(interpretScore(score), () => context as unknown as AudioContext);
       await transport.play();
       return { context, transport };
@@ -115,13 +116,45 @@ describe('audio-clock transport', () => {
     const ordinary = await ring(false);
     const lyre = await ring(true);
     const source = lyre.context.sources[0];
-    expect(source.stop.mock.calls[0][0] - source.start.mock.calls[0][0]).toBeCloseTo(0.67);
+    expect(source.type).toBe('sine');
+    expect(source.stop.mock.calls[0][0] - source.start.mock.calls[0][0]).toBeCloseTo(0.95);
     expect(ordinary.context.sources[0].stop.mock.calls[0][0] - ordinary.context.sources[0].start.mock.calls[0][0]).toBeCloseTo(0.51);
     expect(source.frequency.calls).toEqual(ordinary.context.sources[0].frequency.calls);
-    expect(lyre.context.gains.at(-1)!.gain.calls).toHaveLength(4);
+    expect(lyre.context.sources).toHaveLength(4);
+    expect(lyre.context.sources[1].frequency.calls[0].value / source.frequency.calls[0].value).toBeCloseTo(2.756);
+    expect(lyre.context.sources.slice(1).every(s => s.stop.mock.calls[0][0] < source.stop.mock.calls[0][0])).toBe(true);
     lyre.transport.pause();
-    expect(source.stop.mock.calls.some(args => args.length === 0)).toBe(true);
+    for (const mode of lyre.context.sources) {
+      expect(mode.stop).toHaveBeenCalledWith();
+      mode.onended?.();
+      expect(mode.disconnect).toHaveBeenCalled();
+      expect((mode.connect.mock.calls[0][0] as FakeGain).disconnect).toHaveBeenCalled();
+    }
     ordinary.transport.dispose(); lyre.transport.dispose();
+  });
+  it('uses the same transposed lyre voice for muted-backing taps and preserves its pitch at different speeds', async () => {
+    const { context, transport, score } = setup();
+    const part = score.parts[0];
+    part.renderer = 'lyre';
+    part.register.transpose = 24;
+    context.sampleRate = 44100;
+    transport.setMix({ [part.id]: { muted: true, solo: false } });
+    await transport.play({ skipMuted: true });
+    const tap = () => {
+      const start = context.sources.length;
+      transport.strike(part.id, 84);
+      return context.sources.slice(start);
+    };
+    const first = tap();
+    expect(first).toHaveLength(4);
+    expect(first[0].frequency.calls[0].value).toBeCloseTo(1046.502);
+    for (const mode of first) expect((mode.connect.mock.calls[0][0] as FakeGain).connect).toHaveBeenCalledWith(context.gains[0]);
+    transport.setSpeed(0.5);
+    const slower = tap();
+    expect(slower.map(s => s.frequency.calls)).toEqual(first.map(s => s.frequency.calls));
+    expect(slower.map(s => s.stop.mock.calls[0])).toEqual(first.map(s => s.stop.mock.calls[0]));
+    transport.dispose();
+    expect([...first, ...slower].every(s => s.stop.mock.calls.some(args => args.length === 0))).toBe(true);
   });
   it('handles completion, suspended contexts and cancellation during pending resume', async () => {
     const { context, transport } = setup();

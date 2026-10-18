@@ -3,6 +3,7 @@ import type { Movement, Part, Timeline } from '../score/model';
 import { countIn, metronomeClicks, type Click } from './beats';
 import { SnareSynth } from './snare';
 import { CymbalSample } from './cymbal';
+import { LyreSynth } from './lyre';
 
 export type Mix = Record<string, { muted: boolean; solo: boolean; volume?: number }>;
 export type TransportState = { playing: boolean; position: number; speed: number; status?: string };
@@ -35,6 +36,7 @@ export class Transport {
   private state: TransportState = { playing: false, position: 0, speed: 1 };
   private snare?: SnareSynth;
   private cymbal?: CymbalSample;
+  private lyre?: LyreSynth;
   private parts: Map<string, Part>;
   private clicks: Click[] = [];
   private nextClick = 0;
@@ -99,6 +101,7 @@ export class Transport {
       }
     });
     this.updateGains();
+    this.lyre = new LyreSynth(context, (source, nodes) => this.track(source, nodes));
     // Prepare procedural noise/room buffers before the first live strike.
     if ([...this.parts.values()].some(p => p.percussion && !this.bassParts.has(p.id) && !this.cymbalParts.has(p.id)))
       this.snare = new SnareSynth(context, (source, nodes) => this.track(source, nodes));
@@ -260,14 +263,17 @@ export class Transport {
       this.snare!.strike(when, contact.velocity, output || bus);
       return;
     }
+    if (part.renderer === 'lyre' && !contact.movement.percussion) {
+      this.lyre!.strike(when, contact.movement.pitch + part.register.transpose, contact.velocity, output || bus,
+        output ? undefined : contact.seconds / this.state.speed);
+      return;
+    }
     const length = Math.max(0.02, Math.min(contact.seconds / this.state.speed, 2));
     const gain = ctx.createGain();
     gain.connect(output || bus);
     gain.gain.setValueAtTime(0.0001, when);
     gain.gain.linearRampToValueAtTime(contact.velocity * (contact.movement.percussion ? 0.65 : 0.45), when + 0.003);
-    const lyre = part.renderer === 'lyre' && !contact.movement.percussion;
-    const decay = contact.movement.percussion ? Math.min(length, 0.16) : lyre ? Math.min(2.5, length * 1.2 + 0.06) : length;
-    if (lyre) gain.gain.exponentialRampToValueAtTime(contact.velocity * 0.055, when + Math.min(0.3, length * 0.5));
+    const decay = contact.movement.percussion ? Math.min(length, 0.16) : length;
     gain.gain.exponentialRampToValueAtTime(0.0001, when + decay);
     const osc = ctx.createOscillator();
     osc.type = contact.movement.percussion ? 'sine' : 'triangle';
