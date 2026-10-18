@@ -33,7 +33,7 @@ class FakeContext {
     const data = Array.from({ length: channels }, () => new Float32Array(length));
     return { duration: length / rate, numberOfChannels: channels, getChannelData: (channel: number) => data[channel] };
   }
-  createBiquadFilter() { return Object.assign(new FakeNode(), { frequency: new FakeParam(), type: '' }); }
+  createBiquadFilter() { return Object.assign(new FakeNode(), { frequency: new FakeParam(), Q: new FakeParam(), type: '' }); }
 }
 function setup() {
   const score = parseScore(synthetic([
@@ -252,7 +252,7 @@ describe('audio-clock transport', () => {
     expect(tap.stop).toHaveBeenCalledWith();
   });
   it.each(['heart-of-oak', 'a-life-on-the-ocean-wave', 'the-captain-general'])(
-    'routes the cymbal in %s to the loaded stereo recording with a speed-independent tail', async id => {
+    'routes the cymbal in %s to the recording and scales its damping time without stretching the sample', async id => {
       const score = fixture(id);
       const cymbal = score.parts.find(p => /cymbal/i.test(p.name))!;
       const timeline = interpretScore(score);
@@ -266,9 +266,11 @@ describe('audio-clock transport', () => {
       expect(crash).toBeDefined();
       expect(crash.buffer).toBe(await context.decodeAudioData.mock.results[0].value);
       expect(crash.start).toHaveBeenCalledWith(0.035, 0.03);
-      expect(crash.stop.mock.calls[0][0] - crash.start.mock.calls[0][0]).toBeCloseTo(10.97);
+      const release = 0.08 + 0.12 * firstCrash.velocity;
+      expect(crash.stop.mock.calls[0][0] - crash.start.mock.calls[0][0]).toBeCloseTo(Math.min(10.97, firstCrash.seconds + release));
       const bus = context.gains[1 + score.parts.indexOf(cymbal)];
-      const crashGain = crash.connect.mock.calls[0][0] as FakeGain;
+      const filter = crash.connect.mock.calls[0][0] as FakeNode;
+      const crashGain = filter.connect.mock.calls[0][0] as FakeGain;
       expect(crashGain.connect).toHaveBeenCalledWith(bus);
       transport.setMix({ [cymbal.id]: { muted: true, solo: false } });
       expect(bus.gain.value).toBe(0);
@@ -281,14 +283,16 @@ describe('audio-clock transport', () => {
       expect(crash.stop).toHaveBeenCalledWith();
       expect(slowed.buffer).toBe(crash.buffer);
       expect(slowed.start.mock.calls[0][1]).toBe(0.03);
-      expect(slowed.stop.mock.calls[0][0] - slowed.start.mock.calls[0][0]).toBeCloseTo(10.97);
+      expect(slowed.stop.mock.calls[0][0] - slowed.start.mock.calls[0][0]).toBeCloseTo(Math.min(10.97, firstCrash.seconds * 2 + release));
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
       transport.pause();
       expect(crashes().every(source => source.stop.mock.calls.some(args => args.length === 0))).toBe(true);
       slowed.onended?.();
       expect(slowed.disconnect).toHaveBeenCalled();
-      expect((slowed.connect.mock.calls[0][0] as FakeGain).disconnect).toHaveBeenCalled();
+      const slowedFilter = slowed.connect.mock.calls[0][0] as FakeNode;
+      expect(slowedFilter.disconnect).toHaveBeenCalled();
+      expect((slowedFilter.connect.mock.calls[0][0] as FakeGain).disconnect).toHaveBeenCalled();
       transport.dispose();
     },
   );

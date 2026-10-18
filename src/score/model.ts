@@ -16,11 +16,12 @@ export type Measure = { index: number; sourceIndex?: number; start: Fraction; du
 export type Repeat = { start: number; end: number; count: number };
 export type Ending = { start: number; end: number; passes: number[]; repeat: number };
 export type TieLocation = { measures: number; fraction: Fraction; voices: number; staves: number };
+export type Dynamic = { partId: string; position: Fraction; velocity: number };
 export type WrittenNote = {
   id: string; partId: string; staffId: string; voice: number; measure: number;
   offset: Fraction; position: Fraction; duration: Fraction;
   pitch: number; tpc?: number; percussion: boolean;
-  hand?: Hand; provenance: Provenance; tremolo?: string; velocity: number;
+  hand?: Hand; provenance: Provenance; tremolo?: string; velocity: number; accent?: boolean;
   tieNext?: TieLocation; tiePrev?: TieLocation;
   sourceId?: string;
 };
@@ -29,6 +30,7 @@ export type Score = {
   notes: WrittenNote[]; rests: { partId: string; position: Fraction; duration: Fraction; voice: number }[];
   ties: { from: string; to: string }[];
   tempos: { position: Fraction; bpm: number }[];
+  dynamics: Dynamic[];
   keys: { partId: string; position: Fraction; fifths: number; mode?: string }[];
   signatures: { position: Fraction; signature: Signature }[];
   warnings: string[]; duration: Fraction;
