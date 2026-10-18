@@ -51,13 +51,11 @@ test('a soloed sampled cymbal sounds in practice and its ringing tail obeys mute
   expect(sampleRequests[0]).toContain('marching-hand-cymbal');
 });
 
-test('the recording retains its attack and tail, scales velocity, and overlaps without clipping', async ({ page }) => {
+test('the main crash lands on the beat, retains its tail, scales velocity, and overlaps without clipping', async ({ page }) => {
   await page.goto('./#heart-of-oak');
   const renders = await page.evaluate(async () => {
     const modulePath = '/src/audio/cymbal.ts';
     const { CymbalSample } = await import(/* @vite-ignore */ modulePath);
-    const originalResponse = await fetch('/samples/490163__pjcohen__marching_hand_cymbal_pair_volume_24.wav');
-    const originalBytes = await originalResponse.arrayBuffer();
     const results = [];
     for (const rate of [44100, 48000]) {
       const context = new OfflineAudioContext(2, rate * 14, rate);
@@ -70,16 +68,16 @@ test('the recording retains its attack and tail, scales velocity, and overlaps w
       cymbal.strike(0.29, 1, output);
       cymbal.strike(12.3, 0.5, output);
       const recording = sources[0].buffer!;
-      const original = await context.decodeAudioData(originalBytes.slice(0));
-      const onset = (buffer: AudioBuffer) => buffer.getChannelData(0).findIndex(value => Math.abs(value) > 0.03) / rate;
       const rendered = await context.startRendering();
       const left = rendered.getChannelData(0), right = rendered.getChannelData(1);
+      // Ignore the quieter contact noise: the main crash must arrive on the beat.
+      const onset = left.findIndex((value, i) => Math.max(Math.abs(value), Math.abs(right[i])) > 0.05) / rate;
       const rms = (from: number, to: number) => {
         const data = left.subarray(Math.round(from * rate), Math.round(to * rate));
         return Math.sqrt(data.reduce((sum, value) => sum + value * value, 0) / data.length);
       };
       results.push({ duration: recording.duration, channels: recording.numberOfChannels,
-        onsetShift: Math.abs(onset(recording) - onset(original)),
+        onsetDelay: onset - 0.05, beforeBeat: rms(0, 0.05),
         sharedBuffer: sources.every(source => source.buffer === recording && source.playbackRate.value === 1 && !source.loop),
         finite: left.every(Number.isFinite) && right.every(Number.isFinite),
         peak: left.reduce((peak, value) => Math.max(peak, Math.abs(value)), 0),
@@ -92,7 +90,9 @@ test('the recording retains its attack and tail, scales velocity, and overlaps w
   for (const render of renders) {
     expect(render.duration).toBeCloseTo(11.015, 1);
     expect(render.channels).toBe(2);
-    expect(render.onsetShift).toBeLessThan(0.005);
+    expect(render.beforeBeat).toBe(0);
+    expect(render.onsetDelay).toBeGreaterThanOrEqual(0);
+    expect(render.onsetDelay).toBeLessThan(0.01);
     expect(render.sharedBuffer).toBe(true);
     expect(render.finite).toBe(true);
     expect(render.peak).toBeLessThan(0.5);
