@@ -6,7 +6,7 @@ import { drumFrame, drumLanes, type DrumTiming } from './drum-timing';
 
 export function movementLabel(m: Movement, part: Part) {
   if (!m.percussion) return pitchLabel(m.pitch + part.register.transpose, m.tpc, 'sharps');
-  if (part.renderer === 'snare') return m.roll ? `${m.hand || '—'} Roll` : m.hand || '—';
+  if (part.renderer === 'snare') return m.flam === 'main' ? `${m.hand || '—'} Flam` : m.roll ? `${m.hand || '—'} Roll` : m.hand || '—';
   return 'Strike';
 }
 type Props = { part: Part; active: Movement[]; position: number; movements?: Movement[]; speed?: number; playing?: boolean; drumTiming?: DrumTiming; readPosition?: (timestamp?: number) => number; closeUp?: boolean; allowMotion?: boolean };

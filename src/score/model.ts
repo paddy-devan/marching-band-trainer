@@ -17,6 +17,7 @@ export type Repeat = { start: number; end: number; count: number };
 export type Ending = { start: number; end: number; passes: number[]; repeat: number };
 export type TieLocation = { measures: number; fraction: Fraction; voices: number; staves: number };
 export type Dynamic = { partId: string; position: Fraction; velocity: number };
+export type GraceNote = { pitch: number; tpc?: number; hand?: Hand; provenance: Provenance };
 export type WrittenNote = {
   id: string; partId: string; staffId: string; voice: number; measure: number;
   offset: Fraction; position: Fraction; duration: Fraction;
@@ -24,6 +25,7 @@ export type WrittenNote = {
   hand?: Hand; provenance: Provenance; tremolo?: string; velocity: number; accent?: boolean;
   tieNext?: TieLocation; tiePrev?: TieLocation;
   sourceId?: string;
+  flam?: GraceNote;
 };
 export type Score = {
   id: string; version: string; title: string; composer?: string; parts: Part[]; measures: Measure[];
@@ -39,8 +41,9 @@ export type Score = {
 export type Movement = {
   id: string; partId: string; position: Fraction; duration: Fraction;
   time: number; seconds: number; pitch: number; tpc?: number; percussion: boolean;
-  hand?: Hand; provenance: Provenance; roll: boolean; velocity: number;
+  hand?: Hand; provenance: Provenance; roll: boolean; velocity: number; accent?: boolean;
   sourceIds: string[]; sourceId: string;
+  flam?: 'grace' | 'main';
 };
 export type Timeline = { score: Score; movements: Movement[]; duration: number; warnings: string[] };
 export type CatalogueEntry = { id: string; filename: string; url: string };

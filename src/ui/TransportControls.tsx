@@ -2,7 +2,7 @@ import type { Transport, TransportState } from '../audio/transport';
 import type { Timeline } from '../score/model';
 import type { ReactNode } from 'react';
 
-export const clockLabel = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+export const clockLabel = (seconds: number) => `${Math.floor(Math.max(0, seconds) / 60)}:${String(Math.floor(Math.max(0, seconds) % 60)).padStart(2, '0')}`;
 export function TransportControls({ transport, state, timeline, bar, beat, bpm, children }: { transport: Transport; state: TransportState; timeline: Timeline; bar: number; beat: number; bpm: number; children: ReactNode }) {
   return <section className="transport-controls" aria-label="Playback controls">
     <div className="playback-controls">
@@ -13,7 +13,7 @@ export function TransportControls({ transport, state, timeline, bar, beat, bpm, 
       <div className="bar-readout"><strong>Bar {bar}<span> / {timeline.score.writtenMeasureCount || timeline.score.measures.length}</span></strong><small>Beat {beat}</small></div>
     </div>
     <label className="sr-only" htmlFor="seek">Playback position</label>
-    <input id="seek" aria-label="Playback position" type="range" min="0" max={timeline.duration} step="0.01" value={state.position} onChange={e => transport.seek(Number(e.target.value))} />
+    <input id="seek" aria-label="Playback position" type="range" min="0" max={timeline.duration} step="0.01" value={Math.max(0, state.position)} onChange={e => transport.seek(Number(e.target.value))} />
     <div className="time-readout"><span>{clockLabel(state.position)}</span><span>{clockLabel(timeline.duration)}</span></div>
     {state.status ? <p className="error" role="status">{state.status}</p> : null}
     </div>

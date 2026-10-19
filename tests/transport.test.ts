@@ -50,6 +50,65 @@ describe('audio-clock transport', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }));
   });
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+  it.each([
+    ['Side Drum', 'snare-drum', 'pp', 33], ['Side Drum', 'snare-drum', 'mf', 80], ['Side Drum', 'snare-drum', 'fff', 126],
+    ['Bass Drum', 'bass-drum', 'pp', 33], ['Bass Drum', 'bass-drum', 'mf', 80], ['Bass Drum', 'bass-drum', 'fff', 126],
+  ] as const)('boosts %s accents globally at %s/%s while preserving ordinary hits', async (name, instrument, dynamic, midi) => {
+    const score = parseScore(synthetic([measure(time(2, 4) + tempo(120)),
+      measure(`<Dynamic><subtype>${dynamic}</subtype></Dynamic>` +
+        chord('quarter', 38, '<Articulation><subtype>articAccentAbove</subtype></Articulation>') + chord('quarter', 38))]), 'accents');
+    Object.assign(score.parts[1], { name, instrument });
+    const context = new FakeContext();
+    const transport = new Transport(interpretScore(score), () => context as unknown as AudioContext);
+    await transport.play();
+    context.currentTime = 0.535;
+    vi.advanceTimersByTime(25);
+    const offset = instrument === 'bass-drum' ? 0.003 : 0.0015;
+    const peakAt = (at: number) => context.gains.flatMap(g => g.gain.calls).find(c => Math.abs(c.time - at - offset) < 1e-8)!.value;
+    const accent = peakAt(0.035), normal = peakAt(0.535);
+    expect(normal).toBeCloseTo(midi / 127 * 0.65);
+    expect(accent).toBeCloseTo(Math.min(1, midi / 127 / 0.72) * 1.6 * 0.65);
+    expect(accent / normal).toBeGreaterThan(1.6);
+    transport.dispose();
+  });
+  it.each([0.25, 1, 1.5])('schedules an opening flam before its main beat at %s speed and cancels both strokes', async speed => {
+    const score = parseScore(synthetic([measure(time(2, 4) + tempo(120)),
+      measure(chord('eighth', 38, '<acciaccatura/>') + chord('half', 38))]), 'flam');
+    const context = new FakeContext();
+    const transport = new Transport(interpretScore(score), () => context as unknown as AudioContext);
+    transport.setSpeed(speed);
+    await transport.play();
+    context.currentTime = 0.1;
+    vi.advanceTimersByTime(25);
+    const strikes = context.sources.filter(s => s.buffer);
+    expect(strikes).toHaveLength(2);
+    expect(strikes[0].start.mock.calls[0][0]).toBeCloseTo(0.035);
+    expect(strikes[1].start.mock.calls[0][0]).toBeCloseTo(0.035 + 0.035 / speed);
+    transport.pause();
+    expect(context.sources.every(s => s.stop.mock.calls.some(args => args.length === 0))).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    const count = context.sources.length;
+    transport.seek(0.5);
+    await transport.play();
+    expect(context.sources).toHaveLength(count); // No replay of a flam before the seek point.
+    transport.restart();
+    expect(context.sources.filter(s => s.buffer)).toHaveLength(3 + (speed >= 1 ? 1 : 0));
+    transport.dispose();
+  });
+  it('includes an opening flam in the count-in lead-up without moving the main beat', async () => {
+    const score = parseScore(synthetic([measure(time(2, 4) + tempo(120)),
+      measure(chord('eighth', 38, '<acciaccatura/>') + chord('half', 38))]), 'flam');
+    const context = new FakeContext();
+    const transport = new Transport(interpretScore(score), () => context as unknown as AudioContext);
+    await transport.play({ countIn: true });
+    context.currentTime = 0.95;
+    vi.advanceTimersByTime(25);
+    const strikes = context.sources.filter(s => s.buffer);
+    expect(strikes).toHaveLength(2);
+    expect(strikes[0].start.mock.calls[0][0]).toBeCloseTo(1);
+    expect(strikes[1].start.mock.calls[0][0]).toBeCloseTo(1.035);
+    transport.dispose();
+  });
   it('starts once, derives position from the audio clock, and cancels stale sounds on pause/seek', async () => {
     const { context, transport } = setup();
     await Promise.all([transport.play(), transport.play()]);

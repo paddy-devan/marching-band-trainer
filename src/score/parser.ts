@@ -1,6 +1,6 @@
 import { add, compare, fraction, key, mul, nativeFraction, sub, ZERO, type Fraction } from './fraction';
 import { applyConfig, type TrainerConfig } from './config';
-import type { Hand, Measure, Part, Score, Signature, TieLocation, WrittenNote } from './model';
+import type { GraceNote, Hand, Measure, Part, Score, Signature, TieLocation, WrittenNote } from './model';
 import { child, children, number, parseXml, text } from './xml';
 import { readRepeats } from './repeats';
 import { applyDynamics, dynamicVelocities } from './dynamics';
@@ -96,7 +96,6 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
   const all = Array.from(node.getElementsByTagName('*'));
   if (all.some(e => ['Jump', 'Marker', 'RepeatMeasure'].includes(e.localName)))
     warn('Navigation jumps and measure-repeat symbols are not interpreted.');
-  if (all.some(e => /grace|acciaccatura|appoggiatura/i.test(e.localName))) warn('Grace notes are omitted from playback.');
   if (all.some(e => ['InstrumentChange', 'Ottava', 'TremoloTwoChord', 'MeasureRepeat'].includes(e.localName) || (e.localName === 'Spanner' && e.getAttribute('type') === 'Ottava')))
     warn('Instrument changes, octave spanners, two-chord tremolos and measure repeats are not interpreted. Stored pitches play as written.');
   const staffMeasures = staffs.map(s => children(s, 'Measure'));
@@ -143,6 +142,16 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
         const tuplets: Fraction[] = [];
         const sticking = new Map<string, Hand>();
         const voiceNotes: WrittenNote[] = [];
+        let graceChords: { el: Element; at: string; hand?: Hand }[] = [];
+        const unsupportedGrace = () => warn('Grace notes other than single pre-note snare flams are omitted from playback.');
+        const resolveHand = (n: GraceNote, explicit?: Hand) => {
+          const drum = part.drums[n.pitch];
+          const configured = drum?.line !== undefined && drum.line !== 0 && part.positionHands
+            ? (drum.line < 0 ? part.positionHands.upper : part.positionHands.lower) : undefined;
+          n.hand = explicit || drum?.hand || configured;
+          n.provenance = explicit ? 'explicit' : drum?.hand ? 'drum-map' : configured ? 'configured' : 'unknown';
+          if (explicit && drum?.hand && explicit !== drum.hand) warn(`${part.name}: explicit sticking overrides a conflicting named drum mapping.`);
+        };
         for (const el of Array.from(voiceNode.children)) {
           const at = add(measure.start, cursor);
           switch (el.localName) {
@@ -210,8 +219,28 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
             }
             case 'Chord':
             case 'Rest': {
-              if (Array.from(el.children).some(c => /grace|acciaccatura|appoggiatura/i.test(c.localName))) break;
+              if (Array.from(el.children).some(c => /grace|acciaccatura|appoggiatura/i.test(c.localName))) {
+                graceChords.push({ el, at: key(cursor), hand: sticking.get(key(cursor)) });
+                // Sticking immediately before a grace note belongs to that stroke.
+                sticking.delete(key(cursor));
+                break;
+              }
               const length = mul(duration(el, measure), tuplets.at(-1) || fraction(1));
+              let flam: GraceNote | undefined;
+              if (graceChords.length) {
+                const grace = graceChords[0];
+                const graceNotes = children(grace.el, 'Note');
+                if (graceChords.length === 1 && grace.at === key(cursor) && percussion && part.renderer === 'snare' &&
+                  el.localName === 'Chord' && children(el, 'Note').length === 1 && graceNotes.length === 1 &&
+                  (child(grace.el, 'acciaccatura') || child(grace.el, 'appoggiatura')) &&
+                  !child(grace.el, 'TremoloSingleChord') && !children(graceNotes[0], 'Spanner').length) {
+                  const pitch = number(graceNotes[0], 'pitch', -1);
+                  if (!Number.isInteger(pitch) || pitch < 0 || pitch > 127) throw new Error(`${part.name}, bar ${mi + 1}: invalid grace note pitch.`);
+                  flam = { pitch, tpc: text(graceNotes[0], 'tpc') ? number(graceNotes[0], 'tpc') : undefined, provenance: 'unknown' };
+                  resolveHand(flam, grace.hand);
+                } else unsupportedGrace();
+                graceChords = [];
+              }
               if (el.localName === 'Rest') rests.push({ partId: part.id, position: at, duration: length, voice: vi });
               else {
                 const tremolo = child(el, 'TremoloSingleChord');
@@ -230,6 +259,7 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
                     provenance: 'unknown', tremolo: tremolo ? text(tremolo, 'subtype') : undefined,
                     velocity: accent ? 1 : 0.72, accent,
                     tieNext: location(nextTie && child(nextTie, 'next')), tiePrev: location(previousTie && child(previousTie, 'prev')),
+                    ...(flam ? { flam } : {}),
                   };
                   voiceNotes.push(note);
                   notes.push(note);
@@ -241,16 +271,11 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
           }
         }
         if (tuplets.length) throw new Error(`${part.name}, bar ${mi + 1}: tuplet is missing its end.`);
+        if (graceChords.length) unsupportedGrace();
         if (compare(cursor, measure.duration) > 0) warn(`${part.name}, bar ${mi + 1}: voice exceeds the measure; playback may overlap the next bar.`);
         for (const n of voiceNotes) {
           if (!n.percussion) continue;
-          const explicit = sticking.get(key(n.offset));
-          const drum = part.drums[n.pitch];
-          const configured = drum?.line !== undefined && drum.line !== 0 && part.positionHands
-            ? (drum.line < 0 ? part.positionHands.upper : part.positionHands.lower) : undefined;
-          n.hand = explicit || drum?.hand || configured;
-          n.provenance = explicit ? 'explicit' : drum?.hand ? 'drum-map' : configured ? 'configured' : 'unknown';
-          if (explicit && drum?.hand && explicit !== drum.hand) warn(`${part.name}: explicit sticking overrides a conflicting named drum mapping.`);
+          resolveHand(n, sticking.get(key(n.offset)));
         }
       });
     });
@@ -287,7 +312,8 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
   }
   for (const n of notes) if (n.tiePrev && !ties.some(t => t.to === n.id)) warn(`Bar ${n.measure + 1}: tie continuation has no resolved start.`);
   for (const part of parts.filter(p => p.renderer === 'snare')) {
-    const missing = notes.filter(n => n.partId === part.id && n.percussion && !n.hand).length;
+    const partNotes = notes.filter(n => n.partId === part.id && n.percussion);
+    const missing = partNotes.filter(n => !n.hand).length + partNotes.filter(n => n.flam && !n.flam.hand).length;
     if (missing) warn(`${part.name}: ${missing} written notes have unspecified sticking. Neutral strikes are shown; no hand is invented.`);
   }
   const end = notes.reduce((max, n) => compare(add(n.position, n.duration), max) > 0 ? add(n.position, n.duration) : max, position);

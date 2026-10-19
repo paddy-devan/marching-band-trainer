@@ -5,6 +5,17 @@ import { parseScore } from '../src/score/parser';
 import { chord, fixture, measure, synthetic, tempo, time } from './helpers';
 
 describe('rolls, ties and shared timing', () => {
+  it('retains the three written accents in McAlpine bars 25, 27 and 29 for playback and gestures', () => {
+    const score = fixture('mcalpine');
+    const timeline = interpretScore(score);
+    for (const bar of [25, 27, 29]) {
+      const notes = score.notes.filter(n => n.measure === bar);
+      const movements = timeline.movements.filter(m => notes.some(n => n.id === m.sourceId));
+      expect(movements).toHaveLength(7);
+      expect(movements.map(m => Boolean(m.accent))).toEqual([true, false, false, true, false, false, true]);
+      expect(movements.map(m => m.velocity)).toEqual(notes.map(n => n.velocity));
+    }
+  });
   it.each([
     ['32nd', '', 1], ['16th', '', 2], ['eighth', '', 4], ['eighth', '<dots>1</dots>', 6],
     ['quarter', '', 8], ['half', '', 16], ['whole', '', 32],
@@ -83,10 +94,11 @@ describe('rolls, ties and shared timing', () => {
     const single = timeline.movements.find(m => !m.roll)!;
     expect(audioContacts(single)).toEqual([{ time: single.time, seconds: single.seconds, velocity: single.velocity }]);
   });
-  it('joins the real minim-plus-quaver roll into exactly ten movements', () => {
+  it('joins the fully marked minim-plus-quaver roll into exactly ten movements', () => {
     const score = fixture('colonel-bogey');
     const start = score.notes.find(n => n.tremolo && n.tieNext)!;
     expect(start.hand).toBe('R');
+    expect(score.notes.find(n => n.id === score.ties.find(t => t.from === start.id)!.to)?.tremolo).toBe('r16');
     const timeline = interpretScore(score);
     const roll = timeline.movements.filter(m => m.sourceIds.includes(start.id));
     expect(roll).toHaveLength(10);
@@ -98,6 +110,93 @@ describe('rolls, ties and shared timing', () => {
     contacts.forEach((contact, i) => expect(contact.time).toBeCloseTo(secondsAt(score, fraction(48 + i, 8))));
     expect(roll.at(-1)!.sourceId).toBe(score.ties.find(t => t.from === start.id)!.to);
     expect(timeline.movements.some(m => m.partId === start.partId && value(m.position) === 8.5 && !m.roll)).toBe(true);
+  });
+  it.each(['r8', 'r16', 'r32'])('releases an %s snare roll on an accented tap within the bar', mark => {
+    const next = '<Spanner type="Tie"><next><location><fractions>1/4</fractions></location></next></Spanner>';
+    const previous = '<Spanner type="Tie"><prev><location><fractions>-1/4</fractions></location></prev></Spanner>';
+    const score = parseScore(synthetic([
+      measure(time() + tempo(120)),
+      measure('<Sticking><text>R</text></Sticking>' + chord('quarter', 38, `<TremoloSingleChord><subtype>${mark}</subtype></TremoloSingleChord>`, next) +
+        '<Dynamic><subtype>f</subtype></Dynamic><Sticking><text>L</text></Sticking>' +
+        chord('quarter', 38, '<Articulation><subtype>articAccentAbove</subtype></Articulation>', previous)),
+    ]), 'test');
+    const timeline = interpretScore(score);
+    expect(timeline.movements.map(m => [value(m.position), m.roll, m.hand])).toEqual([
+      [0, true, 'R'], [0.25, true, 'L'], [0.5, true, 'R'], [0.75, true, 'L'], [1, false, 'L'],
+    ]);
+    const release = timeline.movements.at(-1)!;
+    expect(release).toMatchObject({ time: 0.5, seconds: 0.5, velocity: score.notes[1].velocity, sourceIds: [score.notes[1].id] });
+    expect(release.velocity).toBeGreaterThan(timeline.movements[0].velocity);
+    expect(timeline.movements.flatMap(audioContacts).map(c => c.time)).toEqual([0, 0.0625, 0.125, 0.1875, 0.25, 0.3125, 0.375, 0.4375, 0.5]);
+    expect(timeline.warnings.some(w => /roll continuation/.test(w))).toBe(false);
+    // The notated tie remains available on the score.
+    expect(score.ties).toHaveLength(1);
+  });
+  it('keeps marked roll segments connected across bars and releases once on each repeat pass', () => {
+    const next = '<Spanner type="Tie"><next><location><measures>1</measures></location></next></Spanner>';
+    const previous = '<Spanner type="Tie"><prev><location><measures>-1</measures></location></prev></Spanner>';
+    const tremolo = '<TremoloSingleChord><subtype>r32</subtype></TremoloSingleChord>';
+    const bars = measure(time(1, 4) + tempo(120) + '<Sticking><text>R</text></Sticking>' + chord('quarter', 38, tremolo, next)) +
+      measure('<Sticking><text>R</text></Sticking>' + chord('quarter', 38, tremolo, previous + next)) +
+      measure('<Sticking><text>L</text></Sticking>' + chord('quarter', 38, '', previous));
+    const score = parseScore(synthetic([measure(time(1, 4) + tempo(120)) + measure('') + measure(''), bars]), 'test');
+    // Exercise repeat expansion before interpreting the cross-bar roll and release.
+    score.repeats = [{ start: 0, end: 2, count: 2 }];
+    const timeline = interpretScore(score);
+    const movements = timeline.movements.filter(m => m.partId === score.parts[1].id);
+    const rolls = movements.filter(m => m.roll);
+    const taps = movements.filter(m => !m.roll);
+    expect(rolls).toHaveLength(16);
+    expect(rolls.slice(0, 8).map(m => m.hand)).toEqual(['R', 'L', 'R', 'L', 'R', 'L', 'R', 'L']);
+    expect(rolls.every(m => m.sourceIds.length === 2)).toBe(true);
+    expect(taps.map(m => [m.time, m.hand, audioContacts(m).length])).toEqual([[1, 'L', 1], [2.5, 'L', 1]]);
+    expect(rolls.flatMap(audioContacts).filter(c => c.time >= 1 && c.time < 1.5)).toHaveLength(0);
+    expect(timeline.warnings.some(w => /roll continuation/.test(w))).toBe(false);
+  });
+  it('plays every McAlpine roll release as a single tap with its written hand and velocity', () => {
+    const score = fixture('mcalpine');
+    const byId = new Map(score.notes.map(n => [n.id, n]));
+    const releases = score.ties.filter(t => byId.get(t.from)!.tremolo && !byId.get(t.to)!.tremolo);
+    expect(releases).toHaveLength(25);
+    const timeline = interpretScore(score);
+    for (const tie of releases) {
+      const note = byId.get(tie.to)!;
+      const movements = timeline.movements.filter(m => m.sourceIds.includes(note.id));
+      expect(movements).toHaveLength(1);
+      expect(movements[0]).toMatchObject({ roll: false, position: note.position, duration: note.duration, hand: note.hand, velocity: note.velocity });
+      expect(audioContacts(movements[0])).toHaveLength(1);
+    }
+    expect(timeline.warnings.some(w => /lacks a roll mark/.test(w))).toBe(false);
+  });
+  it('sustains ordinary snare ties before and after a marked roll passage', () => {
+    const next = '<Spanner type="Tie"><next><location><measures>1</measures></location></next></Spanner>';
+    const previous = '<Spanner type="Tie"><prev><location><measures>-1</measures></location></prev></Spanner>';
+    const bars = Array.from({ length: 6 }, (_, i) => measure(
+      (i === 0 ? time(1, 4) + tempo(120) : '') +
+      '<Sticking><text>R</text></Sticking>' + chord('quarter', 38,
+        i === 2 || i === 3 ? '<TremoloSingleChord><subtype>r32</subtype></TremoloSingleChord>' : '',
+        (i ? previous : '') + (i < 5 ? next : '')))).join('');
+    const score = parseScore(synthetic([Array.from({ length: 6 }, () => measure(time(1, 4))).join(''), bars]), 'test');
+    const movements = interpretScore(score).movements;
+    expect(movements.filter(m => !m.roll).map(m => [value(m.position), value(m.duration), m.sourceIds.length])).toEqual([[0, 2, 2], [4, 2, 2]]);
+    expect(movements.filter(m => m.roll).map(m => value(m.position))).toEqual([2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75]);
+    expect(score.ties).toHaveLength(5);
+  });
+  it.each([
+    { renderer: 'snare', rollProfile: 'disabled' },
+    { renderer: 'pulse', rollProfile: 'repertoire' },
+  ] as const)('retains tied-note fallback for $renderer/$rollProfile', override => {
+    const next = '<Spanner type="Tie"><next><location><fractions>1/4</fractions></location></next></Spanner>';
+    const previous = '<Spanner type="Tie"><prev><location><fractions>-1/4</fractions></location></prev></Spanner>';
+    const score = parseScore(synthetic([
+      measure(time() + tempo(120)),
+      measure(chord('quarter', 38, '<TremoloSingleChord><subtype>r32</subtype></TremoloSingleChord>', next) + chord('quarter', 38, '', previous)),
+    ]), 'test', { scores: { test: { parts: [{ part: 'Side Drum', ...override }] } } });
+    const timeline = interpretScore(score);
+    expect(timeline.movements).toHaveLength(1);
+    expect(timeline.movements[0]).toMatchObject({ roll: false, seconds: 1 });
+    expect(timeline.movements[0].sourceIds).toHaveLength(2);
+    expect(timeline.warnings.some(w => /unsupported or disabled tremolo/.test(w))).toBe(true);
   });
   it.each([['quarter', 4], ['half', 8]] as const)('expands an R %s roll to %i semiquaver movements', (type, count) => {
     const score = parseScore(synthetic([measure(time() + tempo(120)), measure('<Sticking><text>R</text></Sticking>' + chord(type, 38, '<TremoloSingleChord><subtype>r16</subtype></TremoloSingleChord>'))]), 'test');

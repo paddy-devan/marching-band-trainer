@@ -294,3 +294,68 @@ test.describe('mobile audio clock', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test('an opening flam scores both strokes across the end of the count-in', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await shortDrumScore(page, `<museScore version="4.70"><Score><Division>480</Division><metaTag name="workTitle">Flam check</metaTag>
+    <Part><Staff id="1"><StaffType group="percussion" /></Staff><trackName>Side Drum</trackName><Instrument id="snare-drum"><useDrumset>1</useDrumset>
+      <Drum pitch="38"><name>Left stick</name><line>1</line></Drum><Drum pitch="40"><name>Right stick</name><line>-1</line></Drum></Instrument></Part>
+    <Staff id="1"><Measure><voice><TimeSig><sigN>2</sigN><sigD>4</sigD></TimeSig><Tempo><tempo>2</tempo></Tempo>
+      <Chord><acciaccatura/><durationType>eighth</durationType><Note><pitch>40</pitch></Note></Chord>
+      <Chord><durationType>half</durationType><Note><pitch>38</pitch></Note></Chord>
+    </voice></Measure></Staff></Score></museScore>`);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./#16obr/drum-challenge');
+  await expect(page).toHaveTitle('SLSCC Band');
+  await expect(page.getByRole('heading', { name: 'Flam check' })).toBeVisible();
+  await page.getByRole('button', { name: '100%', exact: true }).click();
+  await page.getByLabel('Drum backing').check();
+  await page.getByRole('button', { name: 'Start attempt' }).click();
+  await expect(page.locator('.drum-note')).toHaveCount(2);
+  await expect(page.locator('.drum-note.right')).toHaveText('R');
+  await expect(page.locator('.drum-note.left')).toHaveText('L');
+  const times = await page.locator('.drum-note').evaluateAll(notes => notes.map(note => Number(note.getAttribute('data-time'))));
+  expect(times).toEqual([-0.035, 0]);
+  await page.screenshot({ path: path.join(tmpdir(), 'mcalpine-flam-challenge-phone.png') });
+  await strikeScheduled(page, 0, 'R');
+  await strikeScheduled(page, 1, 'L');
+  await expect(page.locator('.game-result-stats')).toHaveText('Perfect2Early / late0Missed0Extra / wrong0');
+  const strikes = await page.evaluate(() => (window as unknown as { drumAudio: { strikes: { when: number; scheduled: boolean }[] } }).drumAudio.strikes.filter(s => s.scheduled));
+  expect(strikes).toHaveLength(2);
+  expect(strikes[1].when - strikes[0].when).toBeCloseTo(0.035, 5);
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await page.getByRole('button', { name: 'Start attempt' }).click();
+  await strikeScheduled(page, 3, 'L'); // Main hit alone leaves the grace stroke missed.
+  await expect(page.locator('.game-result-stats')).toHaveText('Perfect1Early / late0Missed1Extra / wrong0');
+  expect(errors).toEqual([]);
+});
+
+test('McAlpine labels flams and animates the lead and main hands on desktop and phone', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto('./#mcalpine');
+  await expect(page).toHaveTitle('SLSCC Band');
+  await expect(page.getByRole('heading', { name: 'McAlpine', exact: true })).toBeVisible();
+  const seek = page.getByRole('slider', { name: 'Playback position', exact: true });
+  for (const [label, viewport] of [['desktop', { width: 1366, height: 900 }], ['phone', { width: 390, height: 844 }]] as const) {
+    await page.setViewportSize(viewport);
+    await seek.fill('0.19'); // Grace hand is low 25 ms before its contact.
+    const graceAngle = await page.locator('.snare .left-stick').evaluate(el => Number((el as SVGElement).style.transform.match(/rotate\(([-\d.]+)deg\)/)![1]));
+    expect(graceAngle).toBeCloseTo(39.5);
+    await page.locator('.visual-panel').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(tmpdir(), `mcalpine-flam-preparation-${label}.png`) });
+    await seek.fill('0.22'); // First grace stroke at 0.215; main hit remains at 0.25.
+    await expect(page.locator('.snare [data-impact="left"]')).toHaveClass(/lit/);
+    await expect(page.locator('.snare [data-impact="right"]')).not.toHaveClass(/lit/);
+    await seek.fill('0.25');
+    await expect(page.locator('.snare [data-impact="right"]')).toHaveClass(/lit/);
+    await expect(page.locator('.current .note-cue').first()).toHaveText('R Flam');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.locator('.visual-panel').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(tmpdir(), `mcalpine-flam-${label}.png`) });
+  }
+  expect(errors).toEqual([]);
+});

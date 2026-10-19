@@ -28,15 +28,32 @@ export function rollInterval(score: Score, n: WrittenNote, part: Part): Fraction
   const compound = sig.denominator === 8 && sig.numerator > 3 && sig.numerator % 3 === 0;
   return compound ? fraction(1, 2) : fraction(1, 4);
 }
+function isSnareRoll(note: WrittenNote, part: Part): boolean {
+  return note.percussion && part.renderer === 'snare' && part.rollProfile !== 'disabled' &&
+    ['r8', 'r16', 'r32'].includes(note.tremolo || '');
+}
+// A performance approximation, in score seconds: practice speed also slows the flam.
+export const FLAM_LEAD_SECONDS = 0.035;
+export const FLAM_GRACE_VELOCITY = 0.4;
 export function interpretScore(score: Score): Timeline {
   score = expandRepeats(score);
   const warnings = [...score.warnings];
   const warn = (message: string) => { if (!warnings.includes(message)) warnings.push(message); };
   const byId = new Map(score.notes.map(n => [n.id, n]));
-  const outgoing = new Map(score.ties.map(t => [t.from, t.to]));
-  const incoming = new Set(score.ties.map(t => t.to));
   const parts = new Map(score.parts.map(p => [p.id, p]));
+  // A snare tie into a plain note connects the roll to its release tap.
+  // Split at changes of technique for playback, retaining the written ties.
+  const playbackTies = score.ties.filter(t => {
+    const from = byId.get(t.from), to = byId.get(t.to);
+    if (to?.flam) return false; // A written flam requires a fresh principal attack.
+    if (!from || !to || Boolean(from.tremolo) === Boolean(to.tremolo)) return true;
+    const marked = from.tremolo ? from : to;
+    return !isSnareRoll(marked, parts.get(marked.partId)!);
+  });
+  const outgoing = new Map(playbackTies.map(t => [t.from, t.to]));
+  const incoming = new Set(playbackTies.map(t => t.to));
   const movements: Movement[] = [];
+  const flams = new Map<string, NonNullable<WrittenNote['flam']>>();
   for (const note of score.notes) {
     if (incoming.has(note.id)) continue;
     const chain = [note];
@@ -49,12 +66,10 @@ export function interpretScore(score: Score): Timeline {
     const length = chain.reduce((sum, n) => add(sum, n.duration), ZERO);
     const end = add(note.position, length);
     const marked = chain.some(n => n.tremolo);
-    const roll = marked && note.percussion && part.renderer === 'snare' && part.rollProfile !== 'disabled' && chain.every(n =>
-      !n.tremolo || ['r8', 'r16', 'r32'].includes(n.tremolo));
+    const roll = marked && chain.every(n => isSnareRoll(n, part));
     if (marked && !roll) warn(`${part.name}: unsupported or disabled tremolo markings play as a single sustained event.`);
     const interval = roll ? rollInterval(score, note, part) : length;
     if (roll) {
-      if (chain.some(n => !n.tremolo)) warn(`${part.name}: a tied roll continuation lacks a roll mark; the roll spans the full tie.`);
       for (const segment of chain.slice(1)) {
         const step = value(sub(segment.position, note.position)) / value(interval);
         const expected = note.hand ? (Math.round(step) % 2 ? (note.hand === 'R' ? 'L' : 'R') : note.hand) : undefined;
@@ -76,12 +91,35 @@ export function interpretScore(score: Score): Timeline {
         seconds: secondsAt(score, add(position, duration)) - time,
         pitch: note.pitch, tpc: note.tpc, percussion: note.percussion, hand,
         provenance: note.provenance, roll, velocity: note.velocity,
+        ...(note.accent ? { accent: true } : {}),
         sourceIds: chain.map(n => n.sourceId || n.id), sourceId: source.sourceId || source.id,
+        ...(i === 0 && note.flam ? { flam: 'main' as const } : {}),
       });
+      if (i === 0 && note.flam) flams.set(movements.at(-1)!.id, note.flam);
       if (!roll) break;
     }
   }
   movements.sort((a, b) => a.time - b.time || a.id.localeCompare(b.id));
+  if (flams.size) {
+    const previous = new Map<string, number>();
+    const graceMovements: Movement[] = [];
+    for (const main of movements) {
+      const grace = flams.get(main.id);
+      if (grace) {
+        const before = previous.get(main.partId);
+        const gap = Math.min(FLAM_LEAD_SECONDS, before !== undefined && before < main.time ? (main.time - before) / 2 : Infinity);
+        graceMovements.push({
+          ...main, id: `${main.id}:grace`, pitch: grace.pitch, tpc: grace.tpc,
+          hand: grace.hand, provenance: grace.provenance, flam: 'grace', roll: false, accent: false,
+          time: main.time - gap, seconds: gap, duration: ZERO, velocity: main.velocity * FLAM_GRACE_VELOCITY,
+          sourceId: `${main.sourceId}:grace`, sourceIds: [`${main.sourceId}:grace`],
+        });
+      }
+      previous.set(main.partId, main.time);
+    }
+    movements.push(...graceMovements);
+    movements.sort((a, b) => a.time - b.time || a.id.localeCompare(b.id));
+  }
   return { score, movements, duration: secondsAt(score, score.duration), warnings };
 }
 
