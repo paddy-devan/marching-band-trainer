@@ -22,7 +22,7 @@ export type WrittenNote = {
   id: string; partId: string; staffId: string; voice: number; measure: number;
   offset: Fraction; position: Fraction; duration: Fraction;
   pitch: number; tpc?: number; percussion: boolean;
-  hand?: Hand; provenance: Provenance; tremolo?: string; velocity: number; accent?: boolean;
+  hand?: Hand; provenance: Provenance; tremolo?: string; velocity: number; dynamicVelocity?: number; accent?: boolean;
   tieNext?: TieLocation; tiePrev?: TieLocation;
   sourceId?: string;
   flam?: GraceNote;
@@ -41,7 +41,7 @@ export type Score = {
 export type Movement = {
   id: string; partId: string; position: Fraction; duration: Fraction;
   time: number; seconds: number; pitch: number; tpc?: number; percussion: boolean;
-  hand?: Hand; provenance: Provenance; roll: boolean; velocity: number; accent?: boolean;
+  hand?: Hand; provenance: Provenance; roll: boolean; velocity: number; dynamicVelocity?: number; accent?: boolean;
   sourceIds: string[]; sourceId: string;
   flam?: 'grace' | 'main';
 };

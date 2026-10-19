@@ -90,7 +90,7 @@ export function interpretScore(score: Score): Timeline {
         id: `${note.id}:movement:${i}`, partId: note.partId, position, duration, time,
         seconds: secondsAt(score, add(position, duration)) - time,
         pitch: note.pitch, tpc: note.tpc, percussion: note.percussion, hand,
-        provenance: note.provenance, roll, velocity: note.velocity,
+        provenance: note.provenance, roll, velocity: note.velocity, dynamicVelocity: note.dynamicVelocity,
         ...(note.accent ? { accent: true } : {}),
         sourceIds: chain.map(n => n.sourceId || n.id), sourceId: source.sourceId || source.id,
         ...(i === 0 && note.flam ? { flam: 'main' as const } : {}),

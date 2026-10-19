@@ -77,6 +77,13 @@ describe('repeat and ending playback', () => {
     // Expansion does not change the written score's dynamics.
     expect(source.notes.at(-1)?.velocity).toBe(112 / 127);
   });
+  it('restores the unmarked mf default before a later dynamic on every repeat pass', () => {
+    const source = parse(bar(60, time() + tempo(120) + start) +
+      bar(61, '<Dynamic><subtype>f</subtype></Dynamic>' + end()));
+    const timeline = interpretScore(source);
+    expect(timeline.movements.map(m => m.velocity)).toEqual([80 / 127, 96 / 127, 80 / 127, 96 / 127]);
+    expect(timeline.movements.map(m => m.dynamicVelocity)).toEqual([80 / 127, 96 / 127, 80 / 127, 96 / 127]);
+  });
   it('preserves ties inside each pass and breaks a tie across a repeat jump', () => {
     const next = '<Spanner type="Tie"><next><location><measures>1</measures></location></next></Spanner>';
     const prev = '<Spanner type="Tie"><prev><location><measures>-1</measures></location></prev></Spanner>';
