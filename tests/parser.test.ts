@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { add, fraction, sub, value } from '../src/score/fraction';
 import { pitchLabel, keyLabel } from '../src/score/labels';
 import { parseScore } from '../src/score/parser';
+import { DEFAULT_VELOCITY } from '../src/score/dynamics';
 import { chord, fixture, measure, synthetic, tempo, time } from './helpers';
 
 describe('written dynamics', () => {
@@ -12,9 +13,9 @@ describe('written dynamics', () => {
       measure('<Rest><durationType>quarter</durationType></Rest>' + chord() + dynamic('pp', 49) + chord('half'));
     const score = parseScore(synthetic([bars, measure(chord('whole', 38)) + measure(chord('whole', 38))]), 'dynamics');
     expect(score.notes.filter(n => n.partId === score.parts[0].id).map(n => n.velocity)).toEqual([
-      0.72, 33 / 127, 64 / 127 / 0.72, 64 / 127, 64 / 127, 49 / 127,
+      DEFAULT_VELOCITY, 33 / 127, 64 / 127 / 0.72, 64 / 127, 64 / 127, 49 / 127,
     ].map(value => expect.closeTo(value, 8)));
-    expect(score.notes.filter(n => n.partId === score.parts[1].id).every(n => n.velocity === 0.72)).toBe(true);
+    expect(score.notes.filter(n => n.partId === score.parts[1].id).every(n => n.velocity === DEFAULT_VELOCITY)).toBe(true);
   });
   it('applies a dynamic to simultaneous notes in another voice regardless of XML traversal order', () => {
     const bars = `<Measure><voice>${time()}${tempo(120)}${chord('half')}${chord('half')}</voice>` +

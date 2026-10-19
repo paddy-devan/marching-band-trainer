@@ -1,7 +1,7 @@
 import { add, compare, nativeFraction, sub, ZERO } from './fraction';
 import type { Ending, Repeat, Score, WrittenNote } from './model';
 import { child, number, text } from './xml';
-import { applyDynamics } from './dynamics';
+import { applyDynamics, DEFAULT_VELOCITY } from './dynamics';
 
 // MuseScore repeat signs are measure properties; volta spanners end at an
 // exclusive measure boundary (or inside the final included measure).
@@ -100,7 +100,7 @@ export function expandRepeats(score: Score): Score {
       if (!tempos.length || tempos.at(-1)!.bpm !== tempo.bpm) tempos.push({ position: start, bpm: tempo.bpm });
       for (const partId of new Set(score.dynamics.map(d => d.partId))) {
         const dynamic = score.dynamics.filter(d => d.partId === partId && compare(d.position, source.start) <= 0).at(-1);
-        dynamics.push({ partId, position: start, velocity: dynamic?.velocity ?? 0.72 });
+        dynamics.push({ partId, position: start, velocity: dynamic?.velocity ?? DEFAULT_VELOCITY });
       }
       for (const part of score.parts.filter(p => !p.percussion && score.keys.some(k => k.partId === p.id))) {
         const key = score.keys.filter(k => k.partId === part.id && compare(k.position, source.start) <= 0).at(-1);

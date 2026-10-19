@@ -1,5 +1,6 @@
 import type { Movement } from '../score/model';
-import { rollContactInterval } from '../score/interpret';
+import { FLAM_GRACE_VELOCITY, rollContactInterval } from '../score/interpret';
+import { ACCENT_VELOCITY_MULTIPLIER, DEFAULT_VELOCITY } from '../score/dynamics';
 
 export const DRUM_TIMING_CONTROLS = {
   visualOffset: { label: 'All visuals offset', min: -300, max: 300, initial: 0 },
@@ -63,46 +64,104 @@ function ease(n: number) {
   const t = Math.max(0, Math.min(1, n));
   return t * t * (3 - 2 * t);
 }
-const SHALLOW_LIFT = 8 / 19.5;
-const ACCENT_EXTRA_LIFT = 20;
+const NORMAL_LIFT = 19.5;
+const SHALLOW_LIFT = 8 / NORMAL_LIFT;
+const HEAD_ANGLE = 47.5;
+const ACCENT_LIFT_MULTIPLIER = 39.5 / NORMAL_LIFT;
+const MAX_LIFT = 55;
 
-function rollContact(previous: DrumGesture, next: DrumGesture | undefined, elapsed: number, speed: number, timing: DrumTiming) {
+function normalLift(note: DrumGesture) {
+  // The grace velocity already includes its quiet-stroke reduction. Keep even
+  // loud flams close to the head (at most ten degrees for the grace downstroke).
+  if (note.flam === 'grace') return NORMAL_LIFT * Math.max(0.1, Math.min(1.25,
+    note.velocity / (DEFAULT_VELOCITY * FLAM_GRACE_VELOCITY)));
+  const velocity = note.dynamicVelocity ?? note.velocity / (note.accent ? ACCENT_VELOCITY_MULTIPLIER : 1);
+  return Math.max(2.5, Math.min(32, NORMAL_LIFT * velocity / DEFAULT_VELOCITY));
+}
+
+// These are visual teaching approximations. Connected strokes prepare during
+// recovery; longer musical gaps relax before a separate, deliberate preparation.
+const CONNECTED_GAP_SECONDS = 1.25;
+const PREPARATION_SECONDS = 0.2;
+
+function strokeLift(note: DrumGesture) {
+  if (note.flam === 'grace') return Math.min(10, SHALLOW_LIFT * normalLift(note));
+  return Math.min(MAX_LIFT, normalLift(note) * (note.accent ? ACCENT_LIFT_MULTIPLIER : 1));
+}
+
+function downstrokeSeconds(note: DrumGesture, gap: number, timing: DrumTiming) {
+  return Math.min(note.flam === 'grace' ? 0.025 : timing.downstroke / 1000, gap * 0.4);
+}
+
+// A single trajectory from the last contact to the next preparation, followed
+// by its downstroke. The next note is always for this hand, not the other hand.
+// releaseAt/startLift also let a roll finish into this same recovery model.
+function recoveryLift(previous: DrumGesture, next: DrumGesture | undefined, at: number, speed: number,
+  timing: DrumTiming, releaseAt = previous.time, startLift = 0, holdContact = true) {
+  const gap = next ? Math.max(0.001, (next.time - releaseAt) / speed) : Infinity;
+  const downstroke = next ? downstrokeSeconds(next, gap, timing) : 0;
+  const hold = holdContact ? Math.min(timing.contact / 1000, gap * 0.15) : 0;
+  const rebound = Math.min(timing.rebound / 1000, Math.max(0.001, gap - downstroke - hold));
+  const connected = next && next.time - releaseAt <= CONNECTED_GAP_SECONDS;
+  const relaxed = next ? Math.min(NORMAL_LIFT, normalLift(previous)) : normalLift(previous);
+  const target = connected ? strokeLift(next) : relaxed;
+  const elapsed = (at - releaseAt) / speed;
+  let lift = startLift + (target - startLift) * ease((elapsed - hold) / rebound);
+  if (next) {
+    const until = (next.time - at) / speed;
+    if (!connected) {
+      // A long rest does not require holding an accent-height stick throughout.
+      const prepare = ease((PREPARATION_SECONDS + downstroke - until) / PREPARATION_SECONDS);
+      lift += (strokeLift(next) - lift) * prepare;
+    }
+    lift *= 1 - ease(1 - until / downstroke);
+  }
+  return lift;
+}
+
+function rollLift(previous: DrumGesture, next: DrumGesture | undefined, at: number, speed: number, timing: DrumTiming) {
+  const elapsed = (at - previous.time) / speed;
   const press = previous.seconds / speed;
   const interval = rollContactInterval(previous) / speed;
   const end = previous.rollEnd ?? previous.time + previous.seconds;
   const run = (end - previous.time) / speed;
   const rebound = timing.rebound / 1000;
-  const lift = SHALLOW_LIFT; // Eight degrees of recovery, about two fifths of a normal lift.
   if (next?.roll && next.time <= end + 1e-8) {
     const gap = (next.time - previous.time) / speed;
-    // Adjoining same-hand notes need a little recovery within the last contact
-    // interval. Alternating hands have room to recover after their own press.
+    // Continuous rolls always keep a shallow recovery, including accents and
+    // dynamic changes. Same-hand adjoining presses recover in their last interval.
     const releaseAt = Math.min(press, gap - Math.min(interval, gap / 2));
     if (elapsed >= releaseAt) {
       const available = (gap - releaseAt) / 2;
       const rise = Math.min(rebound, available);
       const fall = Math.min(timing.downstroke / 1000, available);
-      const recovery = ease((elapsed - releaseAt) / rise) * (1 - ease((elapsed - gap + fall) / fall));
-      return 1 - lift * recovery;
+      return SHALLOW_LIFT * normalLift(next) * ease((elapsed - releaseAt) / rise) *
+        (1 - ease((elapsed - gap + fall) / fall));
     }
   }
   if (elapsed < press) {
-    return 1 - 0.035 * Math.sin(Math.PI * Math.max(0, elapsed / interval)) ** 2;
+    return normalLift(previous) * 0.035 * Math.sin(Math.PI * Math.max(0, elapsed / interval)) ** 2;
   }
-  if (next?.accent && !next.roll && next.flam !== 'grace') {
-    // An accented release needs a full lift once this hand's final press ends,
-    // even while the other hand finishes the roll.
-    const gap = (next.time - previous.time) / speed;
-    const rise = Math.min(rebound, Math.max(0.001, gap - press - timing.downstroke / 1000));
-    return 1 - ease((elapsed - press) / rise);
+  if (next && !next.roll) {
+    // Once this hand finishes its final press, prepare its next single stroke
+    // directly, even if the other hand is still completing the roll passage.
+    return recoveryLift(previous, next, at, speed, timing, previous.time + previous.seconds, 0, false);
   }
-  // Once this hand's final press finishes, relax a little while the other hand
-  // finishes the passage. The full rebound starts at the end of the run.
-  if (elapsed < run) return 1 - lift * ease((elapsed - press) / rebound);
-  const atRelease = 1 - lift * ease((run - press) / rebound);
-  const gap = next ? (next.time - previous.time) / speed : Infinity;
-  const release = Math.min(rebound, Math.max(0.001, gap - timing.downstroke / 1000 - run));
-  return atRelease * (1 - ease((elapsed - run) / release));
+  const shallow = SHALLOW_LIFT * normalLift(previous);
+  if (elapsed < run) return shallow * ease((elapsed - press) / rebound);
+  const atRelease = shallow * ease((run - press) / rebound);
+  return recoveryLift(previous, next, at, speed, timing, end, atRelease, false);
+}
+
+function stickLift(previous: DrumGesture | undefined, next: DrumGesture | undefined, at: number, speed: number, timing: DrumTiming) {
+  if (previous?.roll) return rollLift(previous, next, at, speed, timing);
+  if (previous) return recoveryLift(previous, next, at, speed, timing);
+  if (!next) return NORMAL_LIFT;
+  const downstroke = downstrokeSeconds(next, Infinity, timing);
+  const until = (next.time - at) / speed;
+  const prepare = ease((PREPARATION_SECONDS + downstroke - until) / PREPARATION_SECONDS);
+  const lift = normalLift(next) + (strokeLift(next) - normalLift(next)) * prepare;
+  return lift * (1 - ease(1 - until / downstroke));
 }
 
 export function drumFrame(lanes: DrumGesture[][], position: number, speed: number, timing: DrumTiming) {
@@ -111,36 +170,7 @@ export function drumFrame(lanes: DrumGesture[][], position: number, speed: numbe
   const shifted = (offset: number) => position - (timing.visualOffset + offset) * speed / 1000;
   return lanes.map(notes => {
     const { previous, next } = neighbours(notes, shifted(timing.stickOffset));
-    const at = shifted(timing.stickOffset);
-    const gap = previous && next ? (next.time - previous.time) / speed : Infinity;
-    const downstroke = Math.min(timing.downstroke / 1000, gap * 0.4);
-    const hold = Math.min(timing.contact / 1000, gap * 0.15);
-    const rebound = Math.min(timing.rebound / 1000, Math.max(0.001, gap - downstroke - hold));
-    const elapsed = previous ? (at - previous.time) / speed : 0;
-    let contact = previous ? 1 - ease((elapsed - hold) / rebound) : 0;
-    if (previous?.roll) contact = rollContact(previous, next, elapsed, speed, timing);
-    const rollHandover = previous?.roll && next?.roll && next.time <= (previous.rollEnd ?? previous.time + previous.seconds) + 1e-8;
-    // rollContact already supplies the shallow return to the head. A normal
-    // downstroke here would override that recovery just before the next press.
-    if (next && !rollHandover) {
-      if (next.flam === 'grace') {
-        // Settle close to the head first, then use the same eight-degree lift
-        // as a roll recovery for the quiet grace stroke's short downstroke.
-        const preparation = Math.min(0.12, gap * 0.4);
-        const fall = Math.min(0.025, preparation / 2);
-        const until = (next.time - at) / speed;
-        const ready = (1 - SHALLOW_LIFT) * ease((preparation - until) / (preparation - fall));
-        contact = Math.max(contact, ready + SHALLOW_LIFT * ease(1 - until / fall));
-      } else contact = Math.max(contact, ease(1 - (next.time - at) / speed / downstroke));
-    }
-    let extraLift = 0;
-    if (next?.accent && next.flam !== 'grace' && !rollHandover) {
-      const until = (next.time - at) / speed;
-      const preparation = Math.min(downstroke + 0.12, gap * 0.6);
-      const lift = ease((preparation - until) / (preparation - downstroke)) * (1 - ease(1 - until / downstroke));
-      // Never pull a stick away from a current contact to prepare the next hit.
-      extraLift = ACCENT_EXTRA_LIFT * Math.min(1 - contact, lift);
-    }
+    const lift = stickLift(previous, next, shifted(timing.stickOffset), speed, timing);
     const effect = (offset: number, duration: number, rollOnly = false) => {
       const effectAt = shifted(offset);
       const { previous, next } = neighbours(notes, effectAt);
@@ -148,6 +178,6 @@ export function drumFrame(lanes: DrumGesture[][], position: number, speed: numbe
       const length = Math.min(duration / 1000, next ? (next.time - previous.time) / speed * 0.85 : Infinity);
       return (effectAt - previous.time) / speed < length - 1e-8;
     };
-    return { angle: 28 + 19.5 * contact - extraLift, impact: effect(timing.impactOffset, timing.impactDuration), buzz: effect(timing.buzzOffset, timing.buzzDuration, true) };
+    return { angle: HEAD_ANGLE - lift, impact: effect(timing.impactOffset, timing.impactDuration), buzz: effect(timing.buzzOffset, timing.buzzDuration, true) };
   });
 }

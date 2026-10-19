@@ -3,7 +3,7 @@ import { applyConfig, type TrainerConfig } from './config';
 import type { GraceNote, Hand, Measure, Part, Score, Signature, TieLocation, WrittenNote } from './model';
 import { child, children, number, parseXml, text } from './xml';
 import { readRepeats } from './repeats';
-import { applyDynamics, dynamicVelocities } from './dynamics';
+import { applyDynamics, DEFAULT_VELOCITY, dynamicVelocities } from './dynamics';
 
 const slug = (name: string) => name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'part';
 const durations: Record<string, Fraction> = {
@@ -257,7 +257,7 @@ export function parseScore(xml: string, id: string, customConfig?: TrainerConfig
                     voice: vi, measure: mi, offset: cursor, position: at, duration: length, pitch,
                     tpc: text(n, 'tpc') ? number(n, 'tpc') : undefined, percussion,
                     provenance: 'unknown', tremolo: tremolo ? text(tremolo, 'subtype') : undefined,
-                    velocity: accent ? 1 : 0.72, accent,
+                    velocity: DEFAULT_VELOCITY, accent,
                     tieNext: location(nextTie && child(nextTie, 'next')), tiePrev: location(previousTie && child(previousTie, 'prev')),
                     ...(flam ? { flam } : {}),
                   };
