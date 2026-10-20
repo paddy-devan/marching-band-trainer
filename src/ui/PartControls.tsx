@@ -6,7 +6,7 @@ type Props = { parts: Part[]; mix: Mix; onMix: (mix: Mix) => void };
 export function PartControls({ parts, mix, onMix }: Props) {
   const toggle = (id: string, field: 'muted' | 'solo') => onMix({ ...mix, [id]: { ...mix[id], [field]: !mix[id]?.[field] } });
   return <section className="part-controls" aria-label="Audio mixer">
-    <details open>
+    <details>
       <summary className="mixer-heading"><h2 className="parts-heading">Audio mixer</h2><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></summary>
       <p className="sr-only">M mutes a part. S solos a part. Adjust each part's volume with its slider.</p>
     <div className="part-table">

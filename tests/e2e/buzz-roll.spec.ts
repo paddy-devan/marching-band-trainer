@@ -47,6 +47,7 @@ test('roll sticks remain pressed and Web Audio schedules four even contacts per 
   await seek.fill('8');
   await seek.fill('3.21');
   expect(await angle()).toBeGreaterThan(46.8);
+  await page.locator('.part-controls summary').click();
   await page.getByRole('button', { name: 'Solo Side Drum' }).click();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { buzzStarts: number[] }).buzzStarts.length)).toBeGreaterThanOrEqual(4);

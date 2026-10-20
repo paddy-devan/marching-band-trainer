@@ -26,6 +26,7 @@ test('a soloed sampled cymbal sounds in practice and its ringing tail obeys mute
     };
   });
   await page.goto('./#heart-of-oak');
+  await page.locator('.part-controls summary').click();
   await expect(page.getByRole('button', { name: 'Solo Cymbal', exact: true })).toBeVisible();
   const firstCrash = await page.evaluate(async () => {
     const modulePath = '/src/score/loader.ts';
@@ -173,6 +174,7 @@ test('Captain General dynamics change level and brightness, and its tied crash r
     expect(result.unchangedPitch).toBe(true);
     expect(result.finite).toBe(true);
   }
+  await page.locator('.part-controls summary').click();
   await page.getByRole('button', { name: /^Solo .*Cymbal/i }).click();
   await expect(page.getByRole('button', { name: /^Solo .*Cymbal/i })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Play', exact: true }).click();

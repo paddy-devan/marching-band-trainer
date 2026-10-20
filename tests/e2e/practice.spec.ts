@@ -23,12 +23,16 @@ test('desktop practice controls change real playback and keep following independ
   await expect(page.locator('#speed')).toHaveAttribute('min', '50');
   await expect(page.locator('#speed')).toHaveAttribute('max', '125');
   await expect(page.locator('.tempo-controls .speed-presets button')).toHaveText(['50%', '60%', '80%', '90%', '100%']);
+  const mixer = page.locator('.part-controls details');
+  await expect(mixer).not.toHaveAttribute('open');
+  await expect(page.getByRole('slider', { name: 'Side Drum volume' })).toBeHidden();
+  await mixer.locator('summary').click();
+  await expect(page.getByRole('slider', { name: 'Side Drum volume' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Mute Side Drum' })).toHaveText('M');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   const seek = page.getByRole('slider', { name: 'Playback position' });
   await expect.poll(() => seek.inputValue()).toMatch(/^[1-9]/);
-  const mixer = page.locator('.part-controls details');
   await mixer.locator('summary').click();
   await expect(page.getByRole('slider', { name: 'Side Drum volume' })).toBeHidden();
   const beforeCollapse = Number(await seek.inputValue());
@@ -192,6 +196,7 @@ test('Web Audio produces a signal, immediately mutes it, and keeps the visual tr
   const rms = () => page.evaluate(() => (window as unknown as { audioRms?: () => number }).audioRms?.() || 0);
   await page.goto('./#16obr');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('16 Bar Off Beat Routine (16 OBR)');
+  await page.locator('.part-controls summary').click();
   await page.getByRole('button', { name: 'Solo Side Drum' }).click();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect.poll(rms, { intervals: [30], timeout: 3000 }).toBeGreaterThan(0.0001);
