@@ -1,0 +1,7 @@
+- Maintain `specification.md` as an accurate description of the app's current functionality, key systems and overall architecture.
+- Update the specification whenever a change materially affects app behaviour, systems or architecture.
+- The specification should describe what systems do, how they interact and any important constraints. It need not document individual assets, trivial configuration or low-level implementation details.
+- Treat the specification as a description of the current state, not a changelog. Revise, consolidate or restructure existing sections rather than simply appending information.
+- Keep the document concise, clearly written and accessible to a human reader, while being sufficiently precise to fully constrain the app's important characteristics.
+- Ensure that the specification remains consistent with the implementation. If an approved change supersedes existing behaviour, update the specification accordingly.
+- The role of the README.md file in this repo is only to give a brief overview of the app (max one paragraph), how to run the app locally, and how the app is deployed.
