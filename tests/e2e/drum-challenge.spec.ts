@@ -344,7 +344,9 @@ test('McAlpine labels flams and animates the lead and main hands on desktop and 
     await page.setViewportSize(viewport);
     await seek.fill('0.19'); // Grace hand is low 25 ms before its contact.
     const graceAngle = await page.locator('.snare .left-stick').evaluate(el => Number((el as SVGElement).style.transform.match(/rotate\(([-\d.]+)deg\)/)![1]));
-    expect(graceAngle).toBeCloseTo(39.5);
+    // This grace inherits the accented principal's velocity, reaching the
+    // existing ten-degree grace lift cap (47.5 - 10).
+    expect(graceAngle).toBeCloseTo(37.5);
     await page.locator('.visual-panel').scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(tmpdir(), `mcalpine-flam-preparation-${label}.png`) });
     await seek.fill('0.22'); // First grace stroke at 0.215; main hit remains at 0.25.

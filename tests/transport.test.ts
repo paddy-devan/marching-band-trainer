@@ -162,6 +162,53 @@ describe('audio-clock transport', () => {
     expect(transport.getSnapshot().position).toBe(0);
     transport.dispose();
   });
+  it('preserves each part volume through mute and solo changes', async () => {
+    const { context, transport, score } = setup();
+    const [piano, snare] = score.parts;
+    const mix = { [piano.id]: { muted: false, solo: false, volume: 0.35 }, [snare.id]: { muted: false, solo: false, volume: 0.7 } };
+    transport.setMix(mix);
+    await transport.play();
+    expect(context.gains[1].gain.value).toBe(0.35);
+    expect(context.gains[2].gain.value).toBe(0.7);
+    transport.setMix({ ...mix, [piano.id]: { ...mix[piano.id], muted: true } });
+    expect(context.gains[1].gain.value).toBe(0);
+    transport.setMix({ ...mix, [piano.id]: { ...mix[piano.id], solo: true } });
+    expect(context.gains[1].gain.value).toBe(0.35);
+    expect(context.gains[2].gain.value).toBe(0);
+    transport.setMix(mix);
+    expect(context.gains[2].gain.value).toBe(0.7);
+    expect(transport.getSnapshot().position).toBe(0);
+    transport.dispose();
+  });
+  it('toggles live metronome clicks without cancelling instrument notes or shifting the clock', async () => {
+    const { context, transport } = setup();
+    await transport.play();
+    const instruments = [...context.sources];
+    context.currentTime = 0.435;
+    vi.advanceTimersByTime(25);
+    transport.setMetronome(true);
+    const click = context.sources.at(-1)!;
+    expect(click.frequency.calls[0].value).toBe(1000);
+    expect(click.start).toHaveBeenCalledWith(0.535);
+    expect(transport.getSnapshot().position).toBeCloseTo(0.4);
+    transport.setMetronome(false);
+    expect(click.stop).toHaveBeenCalledWith();
+    expect(instruments.every(source => !source.stop.mock.calls.some(args => args.length === 0))).toBe(true);
+    transport.setMetronome(true);
+    const nextClick = context.sources.at(-1)!;
+    expect(nextClick).not.toBe(click);
+    expect(nextClick.start).toHaveBeenCalledWith(0.535);
+    transport.setSpeed(0.5);
+    expect(nextClick.stop).toHaveBeenCalledWith();
+    context.currentTime = 0.64;
+    vi.advanceTimersByTime(25);
+    expect(context.sources.at(-1)!.start.mock.calls[0][0]).toBeCloseTo(0.67);
+    transport.pause();
+    expect(transport.getSnapshot().metronome).toBe(true);
+    await transport.play();
+    expect(transport.getSnapshot().metronome).toBe(true);
+    transport.dispose();
+  });
   it('gives lyre notes a metal-bar spectrum and ringing tail, with every mode cancelled on pause', async () => {
     const score = parseScore(synthetic([measure(time() + tempo(120) + chord())]), 'test');
     const ring = async (lyre: boolean) => {

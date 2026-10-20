@@ -96,9 +96,11 @@ The local Wrangler OAuth sign-in is separate from the Workers Builds token. Do n
 
 Link directly to a score with its filename ID as a URL fragment, for example `https://band.southliverpoolscc.org/#colonel-bogey`. Selecting a score updates the fragment, and browser Back/Forward restores previous selections. Opening the app without a fragment shows a neutral, searchable score list; no score is selected. Returning to the bare URL, including with browser Back, shows that list again. Missing or unreadable linked scores show an error and let you choose another score. Keep score filenames stable so shared links continue to work.
 
-- Play/pause, restart, seek and change speed from 25–150%. The tempo control shows both the current crotchet BPM and the speed percentage. Speed affects timing, not pitch.
-- Mute individual parts or solo one or more. Mute takes precedence over solo; multiple soloed parts play together. Gain nodes apply changes immediately to scheduled and current sounds.
-- Use the eye icon to select the visualised part independently of the audio mix. The speaker icon mutes a part; the headphones icon solos it. All part controls are in the playback panel. Muted parts can still be visualised.
+- Play/pause, restart, seek and change speed from 50–125%. The tempo control shows both the current crotchet BPM and the speed percentage. Speed affects timing, not pitch.
+- Set each part’s volume from 0–100%, mute individual parts or solo one or more. Mute takes precedence over solo; multiple soloed parts play together. Gain nodes apply changes immediately to scheduled and current sounds.
+- Choose the visualised part from the dropdown in the visualisation header, independently of the audio mixer. M mutes a part and S solos it. Muted parts can still be visualised.
+- Toggle the metronome before or during playback. Its accented downbeats follow the score’s meter and tempo changes and remain independent of the part mix.
+- Tempo presets are 50%, 60%, 80%, 90% and 100%. On phones and tablets the playback controls scroll with the page, leaving the instrument unobscured. Challenge links sit below the audio controls.
 - Read the entire current bar of pitches or sticking, with the next played bar queued below. Simultaneous pitches display together, and rests remain visible. Highlights follow the instrument, briefly releasing between repeated strikes while tied notes remain continuous across bars. Compound meters such as 12/8 count dotted-crotchet beats; the tempo label still uses crotchet BPM from the score.
 - Note labels always use sharps to match the bell lyre. Octaves remain distinct.
 - The lyre beater stays visible, hovers above the first note before playback, then rebounds and moves toward the next played note. Its motion follows playback speed and pauses with the transport.

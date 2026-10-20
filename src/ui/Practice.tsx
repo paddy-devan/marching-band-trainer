@@ -38,17 +38,29 @@ export function Practice({ timeline, onChallenge }: { timeline: Timeline; onChal
     <header className="piece-heading"><h1>{score.title}</h1>{score.composer ? <p>{score.composer}</p> : null}</header>
     <div className="practice-grid">
       <section className="visual-panel" aria-labelledby="visual-title">
-        <div className="visual-heading"><h2 id="visual-title">{part.name}</h2><div className="challenge-actions">
-          {hasLyre ? <button className="challenge-button" onClick={() => { transport.pause(); onChallenge('lyre'); }}><span aria-hidden="true">✦</span> Bell lyre challenge</button> : null}
-          {hasDrum ? <button className="challenge-button" onClick={() => { transport.pause(); onChallenge('drum'); }}><span aria-hidden="true">✦</span> Drum challenge</button> : null}
-        </div></div>
+        <div className="visual-heading">
+          <h2 id="visual-title"><label htmlFor="visual-part">Visualisation</label></h2>
+          <div className="instrument-select">
+            <select id="visual-part" value={selected} onChange={e => setSelected(e.target.value)}>
+              {score.parts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+          </div>
+        </div>
         <div className="instrument-stage"><InstrumentView part={part} active={active} position={state.position} movements={partMovements} speed={state.speed} playing={state.playing} drumTiming={timing} readPosition={readPosition} /></div>
         <BarNotes score={score} part={part} movements={partMovements} measure={measure} position={state.position} active={active} />
       </section>
       <div className="control-column">
         <TransportControls transport={transport} state={state} timeline={timeline} bar={(measure.sourceIndex ?? measure.index) + 1} beat={beat} bpm={tempo.bpm}>
-          <PartControls parts={score.parts} selected={selected} onSelect={setSelected} mix={mix} onMix={changeMix} />
+          <PartControls parts={score.parts} mix={mix} onMix={changeMix} />
         </TransportControls>
+        {hasLyre || hasDrum ? <section className="challenge-launcher" aria-labelledby="challenges-title">
+          <h2 id="challenges-title">Challenges</h2>
+          <div className="challenge-actions">
+            {hasLyre ? <button className="challenge-button" onClick={() => { transport.pause(); onChallenge('lyre'); }}>Bell lyre challenge<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></button> : null}
+            {hasDrum ? <button className="challenge-button" onClick={() => { transport.pause(); onChallenge('drum'); }}>Drum challenge<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></button> : null}
+          </div>
+        </section> : null}
       </div>
     </div>
   </main>;

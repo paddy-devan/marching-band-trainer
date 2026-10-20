@@ -1,24 +1,22 @@
 import type { Mix } from '../audio/transport';
 import type { Part } from '../score/model';
+import { Slider } from './Slider';
 
-type Props = { parts: Part[]; selected: string; onSelect: (id: string) => void; mix: Mix; onMix: (mix: Mix) => void };
-export function PartControls({ parts, selected, onSelect, mix, onMix }: Props) {
+type Props = { parts: Part[]; mix: Mix; onMix: (mix: Mix) => void };
+export function PartControls({ parts, mix, onMix }: Props) {
   const toggle = (id: string, field: 'muted' | 'solo') => onMix({ ...mix, [id]: { ...mix[id], [field]: !mix[id]?.[field] } });
-  return <section className="part-controls" aria-label="Parts">
+  return <section className="part-controls" aria-label="Audio mixer">
     <div className="part-table">
-      <h2 className="parts-heading">Parts</h2>
+      <div className="mixer-heading"><h2 className="parts-heading">Audio mixer</h2><span aria-hidden="true">M = Mute · S = Solo</span></div>
       {parts.map(part => <div className="part-row" key={part.id}>
         <strong>{part.name}</strong>
         <div className="part-actions">
-          <button aria-label={`Mute ${part.name}`} title={`Mute ${part.name}`} aria-pressed={!!mix[part.id]?.muted} className={`icon-button ${mix[part.id]?.muted ? 'is-muted' : ''}`} onClick={() => toggle(part.id, 'muted')}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z" />{mix[part.id]?.muted ? <path d="m16 9 5 6m0-6-5 6" /> : <><path d="M15 8a6 6 0 0 1 0 8" /><path d="M18 5a10 10 0 0 1 0 14" /></>}</svg>
-          </button>
-          <button aria-label={`Solo ${part.name}`} title={`Solo ${part.name}`} aria-pressed={!!mix[part.id]?.solo} className={`icon-button ${mix[part.id]?.solo ? 'is-solo' : ''}`} onClick={() => toggle(part.id, 'solo')}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-3a8 8 0 0 1 16 0v3" /><rect x="3" y="12" width="4" height="8" rx="2" /><rect x="17" y="12" width="4" height="8" rx="2" /></svg>
-          </button>
-          <button className={`icon-button follow-button ${selected === part.id ? 'chosen' : ''}`} aria-label={`Visualise ${part.name}`} title={`Visualise ${part.name}`} aria-pressed={selected === part.id} onClick={() => onSelect(part.id)}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
-          </button>
+          <button aria-label={`Mute ${part.name}`} title={`Mute ${part.name}`} aria-pressed={!!mix[part.id]?.muted} className={`mix-button ${mix[part.id]?.muted ? 'is-muted' : ''}`} onClick={() => toggle(part.id, 'muted')}>M</button>
+          <button aria-label={`Solo ${part.name}`} title={`Solo ${part.name}`} aria-pressed={!!mix[part.id]?.solo} className="mix-button" onClick={() => toggle(part.id, 'solo')}>S</button>
+        </div>
+        <div className="part-volume">
+          <Slider id={`volume-${part.id}`} min={0} max={100} step="1" aria-label={`${part.name} volume`} aria-valuetext={`${Math.round((mix[part.id]?.volume ?? 1) * 100)} percent`} value={Math.round((mix[part.id]?.volume ?? 1) * 100)} onChange={e => onMix({ ...mix, [part.id]: { ...mix[part.id], volume: Number(e.target.value) / 100 } })} />
+          <output htmlFor={`volume-${part.id}`}>{Math.round((mix[part.id]?.volume ?? 1) * 100)}%</output>
         </div>
       </div>)}
     </div>

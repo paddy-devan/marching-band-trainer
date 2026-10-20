@@ -6,7 +6,7 @@ import { CymbalSample } from './cymbal';
 import { LyreSynth } from './lyre';
 
 export type Mix = Record<string, { muted: boolean; solo: boolean; volume?: number }>;
-export type TransportState = { playing: boolean; position: number; speed: number; status?: string };
+export type TransportState = { playing: boolean; position: number; speed: number; metronome: boolean; status?: string };
 export type PlayOptions = { countIn?: boolean; metronome?: boolean; outputTiming?: boolean; skipMuted?: boolean };
 type Contact = { at: number; seconds: number; velocity: number; movement: Movement };
 type SoundSource = AudioScheduledSourceNode;
@@ -25,6 +25,7 @@ export class Transport {
   private master?: GainNode;
   private buses = new Map<string, GainNode>();
   private sources = new Set<SoundSource>();
+  private metronomeSources = new Set<SoundSource>();
   private listeners = new Set<() => void>();
   private mix: Mix = {};
   private contacts: Contact[];
@@ -35,7 +36,7 @@ export class Transport {
   private starting = false;
   private revision = 0;
   private disposed = false;
-  private state: TransportState = { playing: false, position: 0, speed: 1 };
+  private state: TransportState = { playing: false, position: 0, speed: 1, metronome: false };
   private snare?: SnareSynth;
   private cymbal?: CymbalSample;
   private lyre?: LyreSynth;
@@ -127,10 +128,10 @@ export class Transport {
       // unmuting a held or already-scheduled note still works immediately.
       this.skipMuted = options.skipMuted ?? false;
       const leadIn = options.countIn ? countIn(this.timeline) : undefined;
-      this.clicks = options.metronome ? metronomeClicks(this.timeline) : [];
+      this.clicks = metronomeClicks(this.timeline);
       if (leadIn) this.clicks.unshift(...Array.from({ length: leadIn.beats }, (_, beat) => ({ time: -leadIn.duration + beat * leadIn.interval, accent: beat === 0 })));
       const position = leadIn ? -leadIn.duration : this.state.position >= this.timeline.duration ? 0 : this.state.position;
-      this.notify({ playing: true, position, status: undefined });
+      this.notify({ playing: true, position, metronome: options.metronome ?? this.state.metronome, status: undefined });
       this.reanchor(position);
     } catch (error) {
       if (request === this.revision && !this.disposed) this.notify({ playing: false, status: error instanceof Error ? error.message : 'Audio could not start.' });
@@ -162,6 +163,24 @@ export class Transport {
     if (this.state.playing) this.reanchor(position);
   }
   setMix(mix: Mix) { this.mix = mix; this.updateGains(); }
+  setMetronome(enabled: boolean) {
+    if (enabled === this.state.metronome) return;
+    // Cancel only click voices: switching the click never interrupts a held
+    // instrument note or changes the playback anchor.
+    for (const source of this.metronomeSources) {
+      try { source.stop(); } catch { /* Already ended. */ }
+      source.disconnect();
+      this.sources.delete(source);
+    }
+    this.metronomeSources.clear();
+    this.notify({ metronome: enabled });
+    const position = this.position();
+    if (enabled && this.state.playing && position >= 0) {
+      this.nextClick = this.clicks.findIndex(c => c.time >= position - 1e-8);
+      if (this.nextClick < 0) this.nextClick = this.clicks.length;
+      this.tick();
+    }
+  }
   private updateGains() {
     const solo = Object.values(this.mix).some(m => m.solo);
     for (const [id, bus] of this.buses) {
@@ -175,6 +194,7 @@ export class Transport {
     this.timer = undefined;
     for (const source of this.sources) { try { source.stop(); } catch { /* Already ended. */ } source.disconnect(); }
     this.sources.clear();
+    this.metronomeSources.clear();
     this.snare?.clearReverb();
   }
   private reanchor(position: number) {
@@ -207,8 +227,12 @@ export class Transport {
     const horizon = position + 0.12 * this.state.speed;
     while (this.nextClick < this.clicks.length && this.clicks[this.nextClick].time < horizon) {
       const click = this.clicks[this.nextClick++];
+      if (click.time >= 0 && !this.state.metronome) continue;
       const when = this.anchorTime + (click.time - this.anchorPosition) / this.state.speed;
-      if (when >= this.context.currentTime - 0.01) this.tone(click.accent ? 1400 : 1000, Math.max(when, this.context.currentTime), 0.045, 0.3);
+      if (when >= this.context.currentTime - 0.01) {
+        const source = this.tone(click.accent ? 1400 : 1000, Math.max(when, this.context.currentTime), 0.045, 0.3);
+        if (click.time >= 0) this.metronomeSources.add(source);
+      }
     }
     while (this.next < this.contacts.length && this.contacts[this.next].at < horizon) {
       const contact = this.contacts[this.next++];
@@ -232,6 +256,7 @@ export class Transport {
     this.track(oscillator, [gain]);
     oscillator.start(when);
     oscillator.stop(when + duration + 0.01);
+    return oscillator;
   }
   revealStar(index: number) {
     if (!this.context || this.context.state !== 'running' || this.disposed) return;
@@ -253,7 +278,7 @@ export class Transport {
   }
   private track(source: SoundSource, nodes: AudioNode[]) {
     this.sources.add(source);
-    source.onended = () => { this.sources.delete(source); source.disconnect(); nodes.forEach(n => n.disconnect()); };
+    source.onended = () => { this.sources.delete(source); this.metronomeSources.delete(source); source.disconnect(); nodes.forEach(n => n.disconnect()); };
   }
   private sound(contact: Contact, when: number, output?: GainNode) {
     const ctx = this.context!;
