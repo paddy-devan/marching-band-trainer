@@ -24,7 +24,7 @@ test('roll sticks remain pressed and Web Audio schedules four even contacts per 
   await page.goto('./#colonel-bogey');
   await expect(page).toHaveTitle('SLSCC Band');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Colonel Bogey');
-  await page.getByRole('combobox', { name: 'Visualisation' }).selectOption({ label: 'Side Drum' });
+  await page.getByRole('combobox', { name: 'Visualised instrument' }).selectOption({ label: 'Side Drum' });
   // The tied roll begins at score beat 6 (116 BPM), with a right-hand press
   // from ~3.103 to ~3.233 seconds. This is well after a single-stroke rebound.
   const seek = page.getByRole('slider', { name: 'Playback position', exact: true });

@@ -7,7 +7,6 @@ export const clockLabel = (seconds: number) => `${Math.floor(Math.max(0, seconds
 export function TransportControls({ transport, state, timeline, bar, beat, bpm, children }: { transport: Transport; state: TransportState; timeline: Timeline; bar: number; beat: number; bpm: number; children: ReactNode }) {
   return <section className="transport-controls" aria-label="Playback controls">
     <div className="playback-controls">
-    <h2 className="controls-heading">Playback</h2>
     <div className="transport-top">
       <div className="transport-actions"><button className="play-button" aria-label={state.playing ? 'Pause' : 'Play'} onClick={() => state.playing ? transport.pause() : void transport.play()}>
         <svg viewBox="0 0 24 24" aria-hidden="true">{state.playing ? <path d="M7 5h4v14H7zM15 5h4v14h-4z" /> : <path d="m7 4 14 8-14 8z" />}</svg>{state.playing ? 'Pause' : 'Play'}</button>
@@ -23,13 +22,10 @@ export function TransportControls({ transport, state, timeline, bar, beat, bpm, 
     <div className="tempo-controls">
       <div className="speed-heading"><label htmlFor="speed">Tempo</label><output htmlFor="speed"><span>{Math.round(bpm * state.speed)} BPM</span><span>{Math.round(state.speed * 100)}%</span></output></div>
       <Slider id="speed" min={50} max={125} step="5" value={Math.round(state.speed * 100)} aria-valuetext={`${Math.round(bpm * state.speed)} BPM, ${Math.round(state.speed * 100)} percent`} onChange={e => transport.setSpeed(Number(e.target.value) / 100)} />
-      <div className="speed-limits" aria-hidden="true"><span>50%</span><span>125%</span></div>
       <div className="speed-presets">{[0.5, 0.6, 0.8, 0.9, 1].map(speed => <button key={speed} aria-pressed={state.speed === speed} onClick={() => transport.setSpeed(speed)}>{Math.round(speed * 100)}%</button>)}</div>
     </div>
     <label className="metronome-control">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l4 18H5L9 3Z M12 7v10m0-3 5-6" /><circle cx="12" cy="17" r=".6" /></svg>
       <span>Metronome</span>
-      <span className="metronome-state" aria-hidden="true">{state.metronome ? 'On' : 'Off'}</span>
       <input type="checkbox" role="switch" aria-label="Metronome" checked={state.metronome} onChange={e => transport.setMetronome(e.target.checked)} />
     </label>
     {children}

@@ -12,7 +12,7 @@ test('Balaklava dynamics change rendered stick heights, with relative accents an
   await expect(page).toHaveURL(/#balaklava$/);
   await expect(page.getByRole('heading', { name: 'Balaklava', exact: true })).toBeVisible();
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
-  await page.getByRole('combobox', { name: 'Visualisation' }).selectOption({ label: 'Side Drum' });
+  await page.getByRole('combobox', { name: 'Visualised instrument' }).selectOption({ label: 'Side Drum' });
   const targets = await page.evaluate(async () => {
     const modulePath = '/src/score/loader.ts';
     const { loadCatalogue, loadScore } = await import(/* @vite-ignore */ modulePath);

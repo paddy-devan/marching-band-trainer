@@ -39,8 +39,9 @@ export function Practice({ timeline, onChallenge }: { timeline: Timeline; onChal
     <div className="practice-grid">
       <section className="visual-panel" aria-labelledby="visual-title">
         <div className="visual-heading">
-          <h2 id="visual-title"><label htmlFor="visual-part">Visualisation</label></h2>
+          <h2 id="visual-title" className="sr-only">{part.name}</h2>
           <div className="instrument-select">
+            <label htmlFor="visual-part" className="sr-only">Visualised instrument</label>
             <select id="visual-part" value={selected} onChange={e => setSelected(e.target.value)}>
               {score.parts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
