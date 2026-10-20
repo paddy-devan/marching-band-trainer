@@ -46,4 +46,6 @@ export type Movement = {
   flam?: 'grace' | 'main';
 };
 export type Timeline = { score: Score; movements: Movement[]; duration: number; warnings: string[] };
-export type CatalogueEntry = { id: string; filename: string; url: string };
+export type ScoreType = 'drum-solo' | 'full-band';
+export type ScoreMetadata = { type: ScoreType; description: string; sources?: string[] };
+export type CatalogueEntry = { id: string; filename: string; url: string } & Partial<ScoreMetadata>;

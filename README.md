@@ -41,6 +41,16 @@ The preparation script enumerates `.mscz` files automatically, copies the origin
 
 `scores/` is canonical and belongs in Git. `public/generated/`, `node_modules/` and `dist/` are disposable and ignored. The three supplied files are preserved, including `hollyrood.mscz`, whose visible title is **Holyrood**.
 
+### Piece descriptions and types
+
+Edit **`scores.metadata.json`** to maintain the catalogue's descriptions and score types. Each key is the exact score filename without `.mscz` (including the existing spelling `hollyrood`). Each entry has a `type` of `drum-solo` or `full-band`, a short `description` of no more than two sentences, and an optional `sources` array of reference URLs. Titles and composers continue to come from the MuseScore files.
+
+Run `npm run scores` and reload the page after editing metadata, or rebuild for deployment. Preparation merges the metadata into the generated catalogue without changing the score files. Invalid field types, unknown fields and IDs that do not match an existing score stop preparation before the previous generated catalogue is replaced; update metadata keys when renaming or removing scores.
+
+The home screen groups pieces under **Drum solos** and **Full band pieces**, with descriptions beneath their titles. Drum solos use a drum icon throughout the home screen, desktop catalogue and mobile score picker; full band pieces keep the music note. Search includes descriptions and score type as well as titles and composers. Metadata is optional for newly added scores: once loaded, a score containing only percussion parts is shown as a drum solo unless its metadata explicitly says otherwise.
+
+Historical descriptions include source URLs in the JSON so they can be checked and maintained. The descriptions for 16 OBR and Balaklava are based on the supplied scores; their origins and any official march status have not been established.
+
 ## Static deployment
 
 `npm run build` produces **`dist/`**, containing everything needed by a static HTTP host. Copy that directory to the host. No Node.js process is needed in production.

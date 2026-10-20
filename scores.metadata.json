@@ -1,0 +1,94 @@
+{
+  "16obr": {
+    "type": "drum-solo",
+    "description": "A 16-bar off-beat routine for side drum and bass drum, used here to practise rhythmic precision and coordination between the two parts.",
+    "sources": []
+  },
+  "a-life-on-the-ocean-wave": {
+    "type": "full-band",
+    "description": "Henry Russell's nineteenth-century song became the Royal Marines' regimental quick march in Jacob Kappey's arrangement, adopted in 1882.",
+    "sources": [
+      "https://www.royalmarineshistory.com/post/a-life-on-the-ocean-wave"
+    ]
+  },
+  "balaklava": {
+    "type": "full-band",
+    "description": "Credited to R Ford in the supplied score, this march is arranged for bell lyre, side drum and cymbal, with contrasting dynamics and accented drum strokes.",
+    "sources": []
+  },
+  "colonel-bogey": {
+    "type": "full-band",
+    "description": "First published in 1914, Kenneth Alford's famous march gained worldwide recognition through The Bridge on the River Kwai. It is the official march of Canada's King's Own Calgary Regiment.",
+    "sources": [
+      "https://www.marineband.marines.mil/Portals/175/Docs/March%20Mania/2024/march_mania_music_notes2024.pdf",
+      "https://www.canada.ca/en/department-national-defence/services/military-history/history-heritage/official-military-history-lineages/lineages/armour-regiments/kings-own-calgary-regiment.html"
+    ]
+  },
+  "heart-of-oak": {
+    "type": "full-band",
+    "description": "William Boyce's music and David Garrick's words were first heard in the 1759 stage work Harlequin's Invasion. Heart of Oak is the official march of the Royal Navy.",
+    "sources": [
+      "https://www.canada.ca/content/dam/themes/defence/caf/militaryhistory/dhh/popular/customs-traditions-canadian-forces-ch-12.pdf",
+      "https://www.royal-naval-association.co.uk/wp-content/uploads/2025/04/Semaphore-Circular-April-2025.pdf"
+    ]
+  },
+  "hollyrood": {
+    "type": "full-band",
+    "description": "Published in 1912, Holyrood was Kenneth Alford's first march to appear in print. It is the regimental quick march of the RAF Regiment.",
+    "sources": [
+      "https://www.awm.gov.au/collection/C230090",
+      "https://www.raf.mod.uk/display-teams/raf-music-services/news/100-not-out/"
+    ]
+  },
+  "mcalpine": {
+    "type": "drum-solo",
+    "description": "A marching drum solo by Alan Piner, performed by the Royal Marines Corps of Drums. Its alternating hands, rolls and flams make it a useful study in precise rudimental playing.",
+    "sources": [
+      "https://www.rhythm-monster.com/blog/royal-marine-drum-corps-drum-static"
+    ]
+  },
+  "men-of-harlech": {
+    "type": "full-band",
+    "description": "A traditional Welsh air first printed in 1794, believed to commemorate the defence of Harlech Castle. It is the regimental quick march of the Royal Welsh.",
+    "sources": [
+      "https://www.theroyalwelsh.co.uk/_files/ugd/0795fc_2a5c9e4ad9044280bfc91f0bc3a69edc.pdf",
+      "https://www.army.mod.uk/learn-and-explore/about-the-army/corps-regiments-and-units/infantry/royal-welsh/regimental-band-and-corps-of-drums-of-the-royal-welsh/"
+    ]
+  },
+  "ready-aye-ready": {
+    "type": "full-band",
+    "description": "Peter Sumner's march past for the Sea Cadet Corps, arranged here for two bell lyre parts and side drum.",
+    "sources": [
+      "https://www.scribd.com/document/821602705/Ready-Aye-Ready-Solo-Cornet-Bb"
+    ]
+  },
+  "recess": {
+    "type": "full-band",
+    "description": "The lively march theme from Disney's animated series Recess, which debuted in 1997. The theme was written by Randy Petersen and Kevin Quinn.",
+    "sources": [
+      "https://d23.com/a-to-z/recess-television/",
+      "https://www.easysong.com/search/songs/song-copyright-holder-information.aspx?s=2369947"
+    ]
+  },
+  "saints": {
+    "type": "full-band",
+    "description": "A traditional American hymn that became a cornerstone of New Orleans jazz and brass-band music. Louis Armstrong's 1938 recording helped make it famous around the world.",
+    "sources": [
+      "https://www.nps.gov/planyourvisit/event-details.htm?id=545CFD77-0E9E-5E74-23A4FD969611374D"
+    ]
+  },
+  "sarie-marais": {
+    "type": "full-band",
+    "description": "A traditional South African song associated with the Boer commandos, arranged for military band by Vivian Dunn. Dunn's arrangement was officially adopted by the Royal Marines in 1952 as the Commando march.",
+    "sources": [
+      "https://crawleyrmcd.org.uk/wp-content/uploads/RMC-History-Traditional-Facts-Precis-Pack.pdf"
+    ]
+  },
+  "the-captain-general": {
+    "type": "full-band",
+    "description": "Vivian Dunn wrote this march for a Royal Marines dinner attended by King George VI at London's Savoy Hotel in December 1949. Its title honours the King's appointment as Captain General Royal Marines.",
+    "sources": [
+      "https://c-alanpublications.com/captain-general-the/"
+    ]
+  }
+}

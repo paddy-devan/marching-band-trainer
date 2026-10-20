@@ -1,0 +1,55 @@
+import { expect, test } from '@playwright/test';
+
+test('home groups the current pieces, shows descriptions and searches their history and type', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('./');
+  await expect(page).toHaveTitle('SLSCC Band');
+  const solos = page.getByRole('region', { name: 'Drum solos' });
+  const band = page.getByRole('region', { name: 'Full band pieces' });
+  await expect(solos.getByRole('button')).toHaveCount(2);
+  await expect(band.getByRole('button')).toHaveCount(11);
+  await expect(solos.locator('.score-icon svg')).toHaveCount(2);
+  await expect(band.locator('.score-icon')).toHaveText(Array(11).fill('♫'));
+  await expect(page.locator('.score-description')).toHaveCount(13);
+  const search = page.getByRole('searchbox', { name: 'Search scores' });
+  await search.fill('Royal Welsh');
+  await expect(page.locator('.score-choice')).toHaveCount(1);
+  await expect(page.locator('.score-choice')).toContainText('Men of Harlech');
+  await expect(solos).toHaveCount(0);
+  await search.fill('drum solos');
+  await expect(page.locator('.score-choice')).toHaveCount(2);
+  await expect(band).toHaveCount(0);
+  await search.fill('no matching piece');
+  await expect(page.getByRole('status')).toContainText('No scores match');
+  await expect(page.locator('.score-group')).toHaveCount(0);
+  await search.clear();
+  await solos.getByRole('button', { name: /McAlpine/ }).click();
+  await expect(page).toHaveURL(/#mcalpine$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('McAlpine');
+  await expect(page.locator('.catalogue [data-score-type="drum-solo"] .score-icon svg')).toHaveCount(2);
+  await expect(page.locator('.catalogue .score-description')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('phone home and score picker retain the correct type icons and selection flow', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./');
+  await expect(page.getByRole('heading', { name: 'Drum solos' })).toBeVisible();
+  await page.getByRole('button', { name: /16 Bar Off Beat Routine/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('16 Bar Off Beat Routine (16 OBR)');
+  await page.getByRole('button', { name: 'Change score' }).click();
+  const picker = page.getByRole('dialog', { name: /Scores/ });
+  await expect(picker.locator('[data-score-type="drum-solo"] .score-icon svg')).toHaveCount(2);
+  await expect(picker.locator('[data-score-type="full-band"] .score-icon')).toHaveCount(11);
+  await picker.getByRole('searchbox', { name: 'Search scores' }).fill('Royal Welsh');
+  await expect(picker.locator('.score-choice')).toHaveCount(1);
+  await picker.getByRole('button', { name: /Men of Harlech/ }).click();
+  await expect(picker).not.toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Men of Harlech');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+});
