@@ -28,9 +28,7 @@ export function Practice({ timeline, onChallenge }: { timeline: Timeline; onChal
   const partMovements = useMemo(() => timeline.movements.filter(m => m.partId === selected), [timeline, selected]);
   const active = highlightedMovements(partMovements, state.position, state.speed);
   const beats = positionAt(score, state.position);
-  const measure = score.measures.find(m => beats >= value(m.start) && beats < value(m.start) + value(m.duration)) || score.measures.at(-1)!;
-  const beatUnit = measure.signature.numerator > 3 && measure.signature.numerator % 3 === 0 && measure.signature.denominator === 8 ? 1.5 : 4 / measure.signature.denominator;
-  const beat = Math.max(1, Math.floor((Math.min(beats, value(measure.start) + value(measure.duration) - 0.001) - value(measure.start)) / beatUnit) + 1);
+  const measure = score.measures.find(m => beats >= value(m.start) - 1e-8 && beats < value(m.start) + value(m.duration) - 1e-8) || score.measures.at(-1)!;
   const tempo = score.tempos.filter(t => value(t.position) <= beats).at(-1) || score.tempos[0];
   const hasLyre = useMemo(() => playableLyres(timeline).length > 0, [timeline]);
   const hasDrum = useMemo(() => playableDrums(timeline).length > 0, [timeline]);
@@ -52,7 +50,7 @@ export function Practice({ timeline, onChallenge }: { timeline: Timeline; onChal
         <BarNotes score={score} part={part} movements={partMovements} measure={measure} position={state.position} active={active} />
       </section>
       <div className="control-column">
-        <TransportControls transport={transport} state={state} timeline={timeline} bar={(measure.sourceIndex ?? measure.index) + 1} beat={beat} bpm={tempo.bpm}>
+        <TransportControls transport={transport} state={state} timeline={timeline} measure={measure} bpm={tempo.bpm}>
           <PartControls parts={score.parts} mix={mix} onMix={changeMix} />
         </TransportControls>
         {hasLyre || hasDrum ? <section className="challenge-launcher" aria-labelledby="challenges-title">

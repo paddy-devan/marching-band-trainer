@@ -90,17 +90,17 @@ Selecting a piece opens practice and updates the URL fragment to its encoded fil
 
 The practice page has a compact piece heading, instrument view and control column. The instrument dropdown serves as the visual panel heading and selects the part independently of the audio mix. It is possible to follow a muted part. The controls provide:
 
-- Play/pause, restart, seek, elapsed/total time and written bar/beat position.
+- Play/pause, restart, a slider that seeks to bar starts, and the current/total written bar count. Slider steps follow the expanded performance, keeping repeat passes separately reachable and respecting pickups and tempo changes. Beat numbers and timestamps are omitted.
 - Tempo from 50–125%, presets of 50%, 60%, 80%, 90% and 100%, and the effective crotchet BPM. Speed changes timing without changing pitch.
 - A metronome toggle that follows meter and tempo changes, accents downbeats and operates independently of the part mix.
 - An audio mixer collapsed by default, with 0–100% volume and Mute/Solo controls for every part. Multiple solos play together; mute takes precedence. Opening or closing the mixer leaves playback running. Volume percentages appear on hover or focus.
 - Available challenges below the audio controls, outside the instrument view.
 
-Current-bar pitches or sticking appear below the instrument, with the next played bar queued underneath. Chords appear together, rests remain visible, repeated strikes briefly release their highlights, and tied notes stay continuous. Pitch labels use sharps and distinguish octaves. Compound meters count dotted-crotchet beats while the tempo label remains crotchet BPM.
+Current-bar pitches or sticking appear below the instrument, with the next played bar queued underneath. Chords appear together, rests remain visible, repeated strikes briefly release their highlights, and tied notes stay continuous. Pitch labels use sharps and distinguish octaves. The metronome uses dotted-crotchet beats in compound meters while the tempo label remains crotchet BPM.
 
 Lyre beaters and drum sticks follow playback, pause with the transport and reproduce the same pose after seeking. Stick preparation reflects dynamics and accents; each hand recovers towards its next stroke, while rolls and flam grace strokes remain close to the head. The animation is deterministic and separate from audio scheduling and challenge judgement.
 
-Controls support native keyboard interaction and touch targets. On mobile, playback controls scroll with the page so they do not obscure the instrument. Reduced motion retains highlights and labels, disables stick movement and animated beater travel, and leaves a stationary lyre cue above the next note.
+Controls support native keyboard interaction and touch targets. Mobile playback fits Play/Pause, Restart, bar slider and bar count into one row with 44-pixel-high interactive targets. Play/Pause uses an accessible icon button on phones. The row scrolls with the page so it does not obscure the instrument. Reduced motion retains highlights and labels, disables stick movement and animated beater travel, and leaves a stationary lyre cue above the next note.
 
 ## Audio and timing
 

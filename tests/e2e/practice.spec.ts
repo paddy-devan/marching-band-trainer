@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { readdirSync } from 'node:fs';
+import { practiceTime } from './practice-clock';
+import { strToU8, zipSync } from 'fflate';
 
 const scoreCount = readdirSync('scores').filter(file => file.endsWith('.mscz')).length;
 
@@ -32,11 +34,14 @@ test('desktop practice controls change real playback and keep following independ
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   const seek = page.getByRole('slider', { name: 'Playback position' });
-  await expect.poll(() => seek.inputValue()).toMatch(/^[1-9]/);
+  await expect(seek).toHaveAttribute('min', '1');
+  await expect(seek).toHaveAttribute('step', '1');
+  await expect(page.locator('.time-readout, .bar-readout small')).toHaveCount(0);
+  await expect.poll(() => practiceTime(page)).toBeGreaterThan(0.2);
   await mixer.locator('summary').click();
   await expect(page.getByRole('slider', { name: 'Side Drum volume' })).toBeHidden();
-  const beforeCollapse = Number(await seek.inputValue());
-  await expect.poll(async () => Number(await seek.inputValue())).toBeGreaterThan(beforeCollapse + 0.2);
+  const beforeCollapse = await practiceTime(page);
+  await expect.poll(() => practiceTime(page)).toBeGreaterThan(beforeCollapse + 0.2);
   await expect(mixer).not.toHaveAttribute('open');
   await mixer.locator('summary').click();
   await expect(page.getByRole('slider', { name: 'Side Drum volume' })).toBeVisible();
@@ -47,9 +52,9 @@ test('desktop practice controls change real playback and keep following independ
   await expect(page.getByRole('button', { name: 'Solo Bass Drum' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('combobox', { name: 'Visualised instrument' }).locator('option:checked')).toHaveText('Side Drum');
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
-  const paused = Number(await seek.inputValue());
+  const paused = await practiceTime(page);
   await page.waitForTimeout(150);
-  expect(Number(await seek.inputValue())).toBe(paused);
+  expect(await practiceTime(page)).toBe(paused);
   for (const speed of [60, 80, 90, 100]) {
     await page.getByRole('button', { name: `${speed}%`, exact: true }).click();
     await expect(page.locator('#speed')).toHaveValue(String(speed));
@@ -61,8 +66,16 @@ test('desktop practice controls change real playback and keep following independ
   await expect(page.locator('.speed-heading output')).toHaveText('58 BPM50%');
   await seek.fill('8');
   await expect(seek).toHaveValue('8');
+  await expect(page.locator('.bar-readout strong')).toHaveText('Bar 8 / 16');
+  await seek.press('ArrowRight');
+  await expect(page.locator('.bar-readout strong')).toHaveText('Bar 9 / 16');
+  await seek.press('Home');
+  await expect(seek).toHaveValue('1');
+  await seek.press('End');
+  await expect(page.locator('.bar-readout strong')).toHaveText('Bar 16 / 16');
   await page.getByRole('button', { name: 'Restart', exact: true }).click();
-  await expect(seek).toHaveValue('0');
+  await expect(seek).toHaveValue('1');
+  expect(await practiceTime(page)).toBe(0);
   await page.getByRole('button', { name: /Colonel Bogey/ }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Colonel Bogey');
   await expect(page.locator('.piece-heading').getByText('Kenneth J. Alford', { exact: true })).toBeVisible();
@@ -81,29 +94,29 @@ test('desktop practice controls change real playback and keep following independ
   expect(headCentre).toBeGreaterThan(firstBar!.y);
   expect(headCentre).toBeLessThan(firstBar!.y + firstBar!.height / 4);
   const startPose = await beater.getAttribute('style');
-  await seek.fill('0.2');
+  await practiceTime(page, 0.2);
   const intermediatePose = await beater.getAttribute('style');
   expect(intermediatePose).not.toBe(startPose);
-  await seek.fill('0.4');
+  await practiceTime(page, 0.4);
   expect(await beater.getAttribute('style')).not.toBe(intermediatePose);
-  expect(Number(await seek.getAttribute('max'))).toBeCloseTo(72 * 60 / 116, 2);
+  expect(Number(await seek.getAttribute('max'))).toBe(18);
   // Bar 2 opens with two adjacent G-sharps: both views must release and restrike.
-  await seek.fill('2.1');
+  await practiceTime(page, 2.1);
   await expect(page.locator('.bar-notes-row.current .note-cue')).toHaveCount(10);
   await expect(page.locator('.bar-notes-row.current .note-cue').nth(0)).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('.lyre-bar.lit')).toHaveCount(1);
-  await seek.fill('2.3');
+  await practiceTime(page, 2.3);
   await expect(page.locator('.bar-notes-row.current [aria-current="true"]')).toHaveCount(0);
   await expect(page.locator('.lyre-bar.lit')).toHaveCount(0);
   await expect(beater).toBeVisible();
-  await seek.fill('2.34');
+  await practiceTime(page, 2.34);
   await expect(page.locator('.bar-notes-row.current .note-cue').nth(1)).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('.lyre-bar.lit')).toHaveCount(1);
-  await seek.fill('21');
+  await practiceTime(page, 21);
   await expect(page.locator('.bar-readout strong')).toHaveText('Bar 3 / 14');
   await expect(page.locator('.bar-notes-row.current')).toHaveAttribute('aria-label', 'Current bar 3');
   await expect(page.locator('.bar-notes-row.queued')).toHaveAttribute('aria-label', 'Next bar 4');
-  await seek.fill('29');
+  await practiceTime(page, 29);
   await expect(page.locator('.bar-readout strong')).toHaveText('Bar 11 / 14');
   await page.getByRole('button', { name: 'Restart', exact: true }).click();
   await page.getByRole('combobox', { name: 'Visualised instrument' }).selectOption({ label: 'Side Drum' });
@@ -140,6 +153,12 @@ test('phone and tablet catalogue, instrument and primary controls fit and respon
   const playback = page.locator('.playback-controls');
   const play = page.getByRole('button', { name: 'Play', exact: true });
   const visual = page.locator('.visual-panel');
+  expect((await page.locator('.playback-row').boundingBox())!.height).toBe(44);
+  for (const control of [play, page.getByRole('button', { name: 'Restart', exact: true }), page.locator('#seek')]) {
+    const box = (await control.boundingBox())!;
+    expect(box.height).toBe(44);
+    expect(box.y).toBe((await play.boundingBox())!.y);
+  }
   expect((await playback.boundingBox())!.y).toBeLessThan((await visual.boundingBox())!.y);
   expect((await play.boundingBox())!.y + (await play.boundingBox())!.height).toBeLessThan(844);
   await expect(page.locator('.note-octave').first()).toBeVisible();
@@ -216,11 +235,48 @@ test('Web Audio produces a signal, immediately mutes it, and keeps the visual tr
   await metronome.uncheck();
   await expect.poll(rms, { intervals: [30] }).toBeLessThan(0.000001);
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
-  const position = Number(await page.locator('#seek').inputValue());
-  await expect.poll(async () => Number(await page.locator('#seek').inputValue())).toBeGreaterThan(position + 0.3);
+  const position = await practiceTime(page);
+  await expect.poll(() => practiceTime(page)).toBeGreaterThan(position + 0.3);
   await expect(page.getByRole('combobox', { name: 'Visualised instrument' }).locator('option:checked')).toHaveText('Side Drum');
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect.poll(rms, { intervals: [30] }).toBeLessThan(0.000001);
+});
+
+test('bar seeking respects pickups, meter and tempo changes, and separate repeat passes', async ({ page }) => {
+  const note = (duration: string, dots = '') => `<Chord><durationType>${duration}</durationType>${dots}<Note><pitch>60</pitch></Note></Chord>`;
+  const meter = (numerator: number) => `<TimeSig><sigN>${numerator}</sigN><sigD>4</sigD></TimeSig>`;
+  const tempo = (bpm: number) => `<Tempo><tempo>${bpm / 60}</tempo></Tempo>`;
+  const xml = `<museScore version="4.70"><Score><Division>480</Division>
+    <Part><Staff id="1"/><trackName>Piano</trackName><Instrument id="piano"/></Part>
+    <Staff id="1">
+      <Measure len="1/4"><voice>${meter(4)}${tempo(120)}${note('quarter')}</voice></Measure>
+      <Measure><startRepeat/><voice>${note('half')}${tempo(60)}${note('half')}</voice></Measure>
+      <Measure><voice>${meter(3)}${tempo(90)}${note('half', '<dots>1</dots>')}</voice><endRepeat>2</endRepeat></Measure>
+      <Measure><voice>${meter(2)}${tempo(120)}${note('half')}</voice></Measure>
+    </Staff></Score></museScore>`;
+  await page.route('**/generated/scores/*16obr.mscz', route => route.fulfill({
+    body: Buffer.from(zipSync({ 'bars.mscx': strToU8(xml) })), contentType: 'application/octet-stream',
+  }));
+  await page.goto('./#16obr');
+  const seek = page.getByRole('slider', { name: 'Playback position', exact: true });
+  await expect(seek).toHaveAttribute('max', '6');
+  const bars = [1, 2, 3, 2, 3, 4];
+  const starts = [0, 0.5, 3.5, 5.5, 8.5, 10.5];
+  for (const [index, bar] of bars.entries()) {
+    await seek.fill(String(index + 1));
+    await expect(seek).toHaveValue(String(index + 1));
+    await expect(page.locator('.bar-readout strong')).toHaveText(`Bar ${bar} / 4`);
+    await expect(seek).toHaveAttribute('aria-valuetext', `Bar ${bar} of 4, played bar ${index + 1} of 6`);
+    expect(await practiceTime(page)).toBeCloseTo(starts[index], 8);
+  }
+  await page.getByRole('button', { name: '50%', exact: true }).click();
+  await seek.fill('4');
+  expect(await practiceTime(page)).toBeCloseTo(5.5, 8);
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(() => practiceTime(page)).toBeGreaterThan(5.5);
+  await seek.fill('2');
+  expect(await practiceTime(page)).toBeLessThan(0.7);
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
 });
 
 test('one malformed archive does not prevent the other scores from loading', async ({ page }) => {
