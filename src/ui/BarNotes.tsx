@@ -6,6 +6,8 @@ import { beatUnit } from '../audio/beats';
 import { movementLabel } from './InstrumentView';
 
 export type NoteCue = { start: number; end: number; movements: Movement[] };
+const RHYTHM_HEIGHT = 46;
+const LABEL_ROW_STEP = 23;
 
 // Keep every contact in the bar visible, group simultaneous pitches, carry held
 // ties into the next bar, and show silence without conflicting per-voice rests.
@@ -78,7 +80,7 @@ function labelSize(cue: RhythmCue) {
 // Keep label centres at their exact onsets and keep their text at full size.
 // Only use another row when labels collide; row height carries no pitch meaning.
 export function fitRhythmLabels(cues: BarRhythm['cues'], width: number) {
-  const rows: { right: number; height: number }[] = [];
+  const rows: { right: number }[] = [];
   const labels = cues.filter(cue => cue.movements.length).map(cue => {
     const size = labelSize(cue);
     const x = cue.offset * width;
@@ -86,16 +88,15 @@ export function fitRhythmLabels(cues: BarRhythm['cues'], width: number) {
     let row = rows.findIndex(previous => previous.right + 0.5 <= left + 1e-8);
     if (row === -1) {
       row = rows.length;
-      rows.push({ right: x + size.width / 2, height: size.height });
+      rows.push({ right: x + size.width / 2 });
     } else {
       rows[row].right = x + size.width / 2;
-      rows[row].height = Math.max(rows[row].height, size.height);
     }
     return { cue, x, row, ...size };
   });
-  let y = 0;
-  const offsets = rows.map(row => { const top = y; y += row.height + 4; return top; });
-  return labels.map(label => ({ ...label, y: offsets[label.row] }));
+  const occupiedHeight = Math.max(0, ...labels.map(label => label.row * LABEL_ROW_STEP + label.height));
+  const top = (RHYTHM_HEIGHT - occupiedHeight) / 2;
+  return labels.map(label => ({ ...label, y: top + label.row * LABEL_ROW_STEP }));
 }
 
 type RowProps = { rhythm: BarRhythm; bar: Measure; queued?: boolean; progress: number; position: number; lit: Set<string> };
@@ -113,11 +114,10 @@ function RhythmRow({ rhythm, bar, queued = false, progress, position, lit }: Row
   }, []);
   const labels = useMemo(() => width > 0 ? fitRhythmLabels(rhythm.cues, width) : [], [rhythm, width]);
   const labelPositions = useMemo(() => new Map(labels.map(label => [label.cue, label])), [labels]);
-  const height = Math.max(32, ...labels.map(label => label.y + label.height + 10));
   const beatsPerBar = Math.max(value(bar.duration), bar.signature.numerator * 4 / bar.signature.denominator) / beatUnit(bar.signature.numerator, bar.signature.denominator);
   return <div className={`bar-notes-row ${queued ? 'queued' : 'current'}`} aria-label={`${queued ? 'Next' : 'Current'} bar ${(bar.sourceIndex ?? bar.index) + 1}`}>
     <span className="bar-notes-number" aria-hidden="true">{(bar.sourceIndex ?? bar.index) + 1}</span>
-    <div className="rhythm-strip" style={{ '--rhythm-height': `${height}px` } as CSSProperties}>
+    <div className="rhythm-strip">
     <div className="rhythm-track" ref={track}>
       <div className="beat-grid" aria-hidden="true">{rhythm.beats.map(beat => <div key={beat.offset} className={`beat-mark${beat.major ? ' major' : ''}${beat.inactive ? ' inactive' : ''}`} style={{ left: `${beat.offset * 100}%` }}><span>{beat.label}</span></div>)}</div>
       <ol className="note-line">
@@ -130,16 +130,19 @@ function RhythmRow({ rhythm, bar, queued = false, progress, position, lit }: Row
           {cue.labels.length ? (() => {
             const { width: labelWidth, height: labelHeight } = labelSize(cue);
             const fitted = labelPositions.get(cue);
-            return <span className="note-label" style={{ top: fitted?.y ?? 0, width: labelWidth, height: labelHeight }}>
+            const top = fitted?.y ?? (RHYTHM_HEIGHT - labelHeight) / 2;
+            const diameter = Math.max(32, labelWidth + 4, labelHeight + 4);
+            return <>
+            <span className="note-highlight" style={{ top: top + labelHeight / 2, width: diameter, height: diameter }} aria-hidden="true" />
+            <span className="note-label" style={{ top, width: labelWidth, height: labelHeight }}>
             <svg viewBox={`0 0 ${labelWidth} ${labelHeight}`} aria-hidden="true">
-              <rect className="note-highlight" x="0" y="0" width={labelWidth} height={labelHeight} rx="3" />
               {cue.labels.map((label, row) => {
             const pitch = label.match(/^([A-G])([♯♭]?)(-?\d+)$/);
             const technique = label.match(/^(.+) (Roll|Flam)$/);
             return <text key={label} x={labelWidth / 2} y={16 + row * 22} textAnchor="middle">{pitch ? <>{pitch[1]}{pitch[2] ? <tspan className="note-accidental" dy="-4">{pitch[2]}</tspan> : null}<tspan className="note-octave" dy={pitch[2] ? 7 : 3}>{pitch[3]}</tspan></> : technique ? <>{technique[1]}<tspan x={labelWidth / 2} dy="10" className="note-technique"> {technique[2]}</tspan></> : label}</text>;
           })}{cue.held ? <text x={labelWidth / 2} y={labelHeight - 2} textAnchor="middle" className="note-hold">Hold</text> : null}
             </svg>
-            </span>;
+            </span></>;
           })() : <span className={rhythm.cues.length === 1 ? 'bar-rest' : 'sr-only'}>Rest</span>}
         </li>;
       })}
@@ -157,7 +160,7 @@ export function BarNotes({ score, part, movements, measure, position, active }: 
   const nextRhythm = useMemo(() => next ? barRhythm(score, part, movements, next) : undefined, [score, part, movements, next]);
   const progress = currentRhythm.start + currentRhythm.span * Math.max(0, Math.min(1, (positionAt(score, position) - value(measure.start)) / value(measure.duration)));
   const lit = new Set(active.map(m => m.id));
-  return <section className="bar-notes" aria-label="Bar notes">
+  return <section className="bar-notes" aria-label="Bar notes" style={{ '--rhythm-height': `${RHYTHM_HEIGHT}px` } as CSSProperties}>
     <RhythmRow rhythm={currentRhythm} bar={measure} progress={progress} position={position} lit={lit} />
     {next && nextRhythm ? <RhythmRow rhythm={nextRhythm} bar={next} queued progress={0} position={position} lit={lit} /> : <div className="bar-notes-end">End of score</div>}
   </section>;

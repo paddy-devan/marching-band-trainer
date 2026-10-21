@@ -109,8 +109,8 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .stick-shine { fill: none; stroke: #efe0c7; stroke-width: 1.5; stroke-linecap: round; }
 .instrument-svg text { font-family: 'DM Sans', system-ui, sans-serif; }.snare > text, .pulse > text { fill: var(--muted); font-size: 14px; }
 .bar-notes { border-top: 1px solid var(--line); padding: 2px 20px; }
-.bar-notes-row { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; column-gap: 6px; padding: 6px 0; min-width: 0; }
-.bar-notes-row.queued { border-top: 1px solid var(--line); }
+.bar-notes-row { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; column-gap: 6px; padding: 6px 0; min-width: 0; height: calc(var(--rhythm-height) + 34px); }
+.bar-notes-row.queued { box-shadow: inset 0 1px 0 var(--line); }
 .bar-notes-number { align-self: start; color: var(--muted); font-size: 11px; line-height: 12px; font-variant-numeric: tabular-nums; }
 .current .bar-notes-number { color: var(--ink); font-weight: 500; }
 .rhythm-strip { min-width: 0; }
@@ -124,21 +124,21 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .beat-mark > span { position: absolute; left: 0; transform: translateX(-50%); color: #657983; font-size: 10px; font-variant-numeric: tabular-nums; line-height: 12px; }
 .note-line { position: relative; z-index: 1; height: var(--rhythm-height); list-style: none; margin: 0; padding: 0; }
 .note-cue { position: absolute; top: 0; height: 100%; color: var(--ink); font-family: Manrope, system-ui, sans-serif; font-size: 16px; font-weight: 650; line-height: 1.4; }
-.note-label { position: absolute; left: 0; transform: translateX(-50%); }
+.note-label { position: absolute; z-index: 1; left: 0; transform: translateX(-50%); }
 .note-label svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .note-label text { fill: currentColor; font-size: 16px; font-weight: 650; }
-.note-highlight { fill: transparent; }
+.note-highlight { position: absolute; left: 0; transform: translate(-50%, -50%); border-radius: 50%; background: transparent; pointer-events: none; }
 .note-accidental { font-size: .8em; font-weight: 500; fill: currentColor; color: inherit; }
 .note-octave { font-size: .6em; font-weight: 500; line-height: 0; vertical-align: -.2em; color: var(--muted); margin-left: 1px; }
 .note-cue.lit .note-octave { color: #3f5662; }
 .note-label .note-technique, .note-label .note-hold { font-family: 'DM Sans', system-ui, sans-serif; font-size: 8px; font-weight: 400; fill: currentColor; }
 .note-cue.played, .queued .note-cue { color: var(--muted); }
-.bar-rest { position: absolute; top: 7px; left: 50%; transform: translateX(-50%); color: var(--muted); font-family: 'DM Sans', system-ui, sans-serif; font-size: 11px; font-weight: 400; }
+.bar-rest { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--muted); font-family: 'DM Sans', system-ui, sans-serif; font-size: 11px; font-weight: 400; }
 .note-cue.lit .note-label { color: var(--cyan-dark); }
-.note-cue.lit .note-highlight { fill: var(--selected); }
+.note-cue.lit .note-highlight { background: var(--selected); }
 .rhythm-playhead { position: absolute; top: 6px; bottom: 0; width: 2px; transform: translateX(-1px); background: var(--cyan-dark); pointer-events: none; }
 .rhythm-playhead::before { content: ''; position: absolute; top: -3px; left: -2px; width: 6px; height: 6px; background: var(--cyan-dark); border-radius: 50%; box-shadow: 0 0 0 3px #fff; }
-.bar-notes-end { border-top: 1px solid var(--line); padding: 6px 0; font-size: 10px; color: var(--muted); }
+.bar-notes-end { display: flex; align-items: center; height: calc(var(--rhythm-height) + 34px); border-top: 1px solid var(--line); padding: 6px 0; font-size: 10px; color: var(--muted); }
 .range-warning { font-size: 13px; color: #a33c35; text-align: center; }
 .transport-controls { border: 1px solid var(--line); border-radius: 10px; background: #fff; }
 .playback-controls { padding: 20px 20px 14px; }

@@ -271,12 +271,18 @@ test('rhythm strips align notes with beats and keep dense bars readable on phone
     return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
   }));
   labels.forEach((label, i) => labels.slice(0, i).forEach(previous => {
-    expect(label.left < previous.right && label.right > previous.left && label.top < previous.bottom && label.bottom > previous.top).toBe(false);
+    const overlapX = label.left < previous.right && label.right > previous.left;
+    if (Math.abs(label.top - previous.top) < 0.5) expect(overlapX).toBe(false);
+    else if (overlapX) expect(Math.min(label.bottom, previous.bottom) - Math.max(label.top, previous.top)).toBeLessThanOrEqual(2.1);
   }));
   await practiceTime(page, 2.1); // Safely inside the first attack after the saved tempo's rounding.
-  const selectedFill = await current.locator('.lit .note-highlight').evaluate(el => getComputedStyle(el).fill);
+  const highlight = current.locator('.lit .note-highlight');
+  const selectedFill = await highlight.evaluate(el => getComputedStyle(el).backgroundColor);
   const presetFill = await page.getByRole('button', { name: '100%', exact: true }).evaluate(el => getComputedStyle(el).backgroundColor);
   expect(selectedFill).toBe(presetFill);
+  const circle = (await highlight.boundingBox())!;
+  expect(circle.width).toBe(circle.height);
+  expect(await highlight.evaluate(el => getComputedStyle(el).borderRadius)).toBe('50%');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   const before = await practiceTime(page);
@@ -303,7 +309,9 @@ test('lyre semiquavers stay at exact onsets in two readable stationary rows on p
     expect(label.x).toBeGreaterThanOrEqual(0);
     expect(label.x + label.width).toBeLessThanOrEqual(320);
     for (const other of labels.slice(0, i)) {
-      expect(label.x < other.x + other.width && label.x + label.width > other.x && label.y < other.y + other.height && label.y + label.height > other.y).toBe(false);
+      const overlapX = label.x < other.x + other.width && label.x + label.width > other.x;
+      if (Math.abs(label.y - other.y) < 0.5) expect(overlapX).toBe(false);
+      else if (overlapX) expect(Math.min(label.y + label.height, other.y + other.height) - Math.max(label.y, other.y)).toBeLessThanOrEqual(2.1);
     }
   }
   expect((await current.boundingBox())!.height).toBeLessThan(100);
@@ -311,6 +319,31 @@ test('lyre semiquavers stay at exact onsets in two readable stationary rows on p
   await practiceTime(page, 0.5);
   expect((await current.locator('.rhythm-playhead').boundingBox())!.x).toBeGreaterThan(initialHead + 10);
   expect(await measureLabels()).toEqual(labels);
+});
+
+test('note bars keep the mixer stationary through sparse, dense, silent and final bars', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 1000 });
+  const geometry = () => page.evaluate(() => ({
+    height: document.querySelector('.bar-notes')!.getBoundingClientRect().height,
+    slots: [...document.querySelector('.bar-notes')!.children].map(el => el.getBoundingClientRect().height),
+    mixer: document.querySelector('.part-controls')!.getBoundingClientRect().y + scrollY,
+  }));
+  await page.goto('./#hollyrood');
+  const seek = page.locator('#seek');
+  await seek.fill('10');
+  const dense = await geometry();
+  for (const bar of ['13', (await seek.getAttribute('max'))!]) {
+    await seek.fill(bar);
+    expect(await geometry()).toEqual(dense);
+  }
+  await expect(page.locator('.bar-notes-end')).toHaveText('End of score');
+  await page.goto('./#balaklava');
+  await page.getByRole('combobox', { name: 'Visualised instrument' }).selectOption({ label: 'Cymbal' });
+  await expect(page.locator('.current .bar-rest')).toHaveText('Rest');
+  const silent = await geometry();
+  await seek.fill('2');
+  await expect(page.locator('.current .note-label').first()).toBeVisible();
+  expect(await geometry()).toEqual(silent);
 });
 
 test('bar seeking respects pickups, meter and tempo changes, and separate repeat passes', async ({ page }) => {

@@ -107,15 +107,16 @@ describe('beat-proportional bar layout', () => {
     const part = score.parts[0];
     const current = barRhythm(score, part, movements, score.measures[0]);
     const next = barRhythm(score, part, movements, score.measures[1]);
-    expect(fitRhythmLabels(current.cues, 400).map(label => label.y)).toEqual([0, 0, 0]);
-    expect(fitRhythmLabels(next.cues, 400).map(label => label.y)).toEqual([0]);
+    const currentLabels = fitRhythmLabels(current.cues, 400);
+    expect(new Set(currentLabels.map(label => label.y)).size).toBe(1);
+    expect(fitRhythmLabels(next.cues, 400)[0].y).toBe(currentLabels[0].y);
   });
 
   it.each([
     ['the-captain-general', 0, 238, 2],
     ['the-captain-general', 1, 238, 2],
     ['colonel-bogey', 1, 206, 3],
-  ] as const)('keeps %s bar %i at exact onsets with readable, non-overlapping rows', (name, bar, width, rows) => {
+  ] as const)('keeps %s bar %i at exact onsets with readable staggered labels', (name, bar, width, rows) => {
     const { score, movements } = interpretScore(fixture(name));
     const part = score.parts.find(part => part.renderer === 'lyre')!;
     const rhythm = barRhythm(score, part, movements.filter(movement => movement.partId === part.id), score.measures[bar]);
@@ -127,8 +128,11 @@ describe('beat-proportional bar layout', () => {
       expect(label.height).toBe(22);
       for (const previous of fitted.slice(0, index)) {
         const overlapX = label.x - label.width / 2 < previous.x + previous.width / 2;
-        const overlapY = label.y < previous.y + previous.height && previous.y < label.y + label.height;
-        expect(overlapX && overlapY).toBe(false);
+        if (label.row === previous.row) expect(overlapX).toBe(false);
+        else if (overlapX) {
+          const overlapY = Math.min(label.y + label.height, previous.y + previous.height) - Math.max(label.y, previous.y);
+          expect(overlapY).toBeLessThanOrEqual(2);
+        }
       }
     }
     expect(rhythm.cues.map(cue => cue.offset)).toEqual(onsets);
