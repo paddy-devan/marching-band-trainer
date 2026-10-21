@@ -3,6 +3,7 @@
   color: #243642; background: #fff; font-synthesis: none;
   --cyan: #02afda; --cyan-dark: #007a94; --ink: #243642; --brand-blue: #22b0d9;
   --muted: #677680; --line: #dde3e7; --surface: #f6f8f9; --selected: #e5f7fb;
+  --app-header-height: 80px;
 }
 * { box-sizing: border-box; }
 body { margin: 0; }
@@ -17,12 +18,12 @@ h1, h2, .brand { font-family: Manrope, system-ui, sans-serif; }
 h1 { font-size: clamp(25px, 3vw, 36px); line-height: 1.3; letter-spacing: -1px; font-weight: 800; }
 h2 { font-size: 18px; font-weight: 750; }
 small { display: block; font-size: 12px; color: var(--muted); }
-.app-header { height: 64px; padding: 0 24px; display: flex; align-items: center; background: var(--brand-blue); }
+.app-header { height: var(--app-header-height); padding: 0 24px; display: flex; align-items: center; background: var(--brand-blue); }
 .brand { display: flex; align-items: center; gap: 14px; text-decoration: none; color: #fff; font-size: 20px; font-weight: 600; }
 .brand:focus-visible { outline-color: #fff; }
 .brand strong { font-weight: 800; }
 .brand-mark { display: block; width: 28px; height: 32px; flex-shrink: 0; background: #fff; -webkit-mask: url('./assets/band-wave.svg') center / contain no-repeat; mask: url('./assets/band-wave.svg') center / contain no-repeat; mask-mode: alpha; }
-.app-layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: calc(100vh - 64px); }
+.app-layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: calc(100vh - var(--app-header-height)); }
 .score-landing-layout { display: block; }
 .score-landing { width: 100%; max-width: 680px; margin: 0 auto; padding: 40px 24px; }
 .score-landing-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
@@ -210,10 +211,10 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
   .practice .challenge-launcher { grid-row: 4; margin-top: 0; }
 }
 @media (max-width: 720px) {
-  .app-header { height: 56px; padding: 0 20px; }.brand { font-size: 17px; gap: 11px; }.app-layout { display: block; min-height: calc(100dvh - 56px); }
+  .app-header { padding: 0 20px; }.brand { font-size: 17px; gap: 11px; }.app-layout { display: block; min-height: calc(100dvh - var(--app-header-height)); }
   .score-landing { padding: 28px 20px; }
   .catalogue { display: none; }
-  .mobile-score-switcher { display: flex; align-items: center; gap: 16px; justify-content: space-between; padding: 14px 20px; background: #fff; border-bottom: 1px solid var(--line); }
+  .mobile-score-switcher { display: flex; align-items: center; gap: 16px; justify-content: space-between; min-height: var(--app-header-height); padding: 14px 20px; background: #fff; border-bottom: 1px solid var(--line); }
   .mobile-score-switcher > div { min-width: 0; }
   .mobile-score-switcher h1 { font-size: 18px; font-weight: 600; line-height: 1.4; letter-spacing: -.3px; overflow-wrap: anywhere; }
   .mobile-score-switcher p { margin-top: 4px; font-size: 13px; color: var(--muted); line-height: 1.4; overflow-wrap: anywhere; }
