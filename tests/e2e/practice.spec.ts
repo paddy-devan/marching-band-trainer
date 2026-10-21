@@ -242,6 +242,77 @@ test('Web Audio produces a signal, immediately mutes it, and keeps the visual tr
   await expect.poll(rms, { intervals: [30] }).toBeLessThan(0.000001);
 });
 
+test('rhythm strips align notes with beats and keep dense bars readable on phones', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 1050 });
+  await page.goto('./#colonel-bogey');
+  await page.locator('#seek').fill('2');
+  const current = page.locator('.bar-notes-row.current');
+  await expect(current.locator('.beat-mark span').filter({ hasText: /^\d$/ })).toHaveText(['1', '2', '3', '4']);
+  const firstNote = (await current.locator('.note-label').first().boundingBox())!;
+  const firstBeat = (await current.locator('.beat-mark').first().boundingBox())!;
+  expect(firstNote.x + firstNote.width / 2).toBeCloseTo(firstBeat.x, 0);
+  await practiceTime(page, 6 * 60 / 116); // Halfway through written bar 2.
+  expect(await current.locator('.rhythm-playhead').evaluate(el => parseFloat((el as HTMLElement).style.left))).toBeCloseTo(50, 2);
+  await page.setViewportSize({ width: 320, height: 667 });
+  await practiceTime(page, 7.5 * 60 / 116);
+  await expect(page.locator('.rhythm-scroll, .bar-notes-label')).toHaveCount(0);
+  await expect(current.locator('.bar-notes-number')).toHaveText('2');
+  const strip = current.locator('.rhythm-strip');
+  expect(await strip.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect((await current.boundingBox())!.height).toBeLessThan(85);
+  const head = (await current.locator('.rhythm-playhead').boundingBox())!;
+  const viewport = (await strip.boundingBox())!;
+  expect(head.x).toBeGreaterThanOrEqual(viewport.x);
+  expect(head.x).toBeLessThan(viewport.x + viewport.width);
+  const labels = await current.locator('.note-label').evaluateAll(els => els.map(el => {
+    const box = el.getBoundingClientRect();
+    return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+  }));
+  labels.forEach((label, i) => labels.slice(0, i).forEach(previous => {
+    expect(label.left < previous.right && label.right > previous.left && label.top < previous.bottom && label.bottom > previous.top).toBe(false);
+  }));
+  await practiceTime(page, 2.1); // Safely inside the first attack after the saved tempo's rounding.
+  const selectedFill = await current.locator('.lit .note-highlight').evaluate(el => getComputedStyle(el).fill);
+  const presetFill = await page.getByRole('button', { name: '100%', exact: true }).evaluate(el => getComputedStyle(el).backgroundColor);
+  expect(selectedFill).toBe(presetFill);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  const before = await practiceTime(page);
+  await expect.poll(() => practiceTime(page)).toBeGreaterThan(before + 0.2);
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  expect(errors).toEqual([]);
+});
+
+test('lyre semiquavers stay at exact onsets in two readable stationary rows on phones', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 667 });
+  await page.goto('./#the-captain-general');
+  const current = page.locator('.bar-notes-row.current');
+  await expect(current.locator('.note-label')).toHaveCount(12);
+  const measureLabels = () => current.locator('.note-label').evaluateAll(els => els.map(el => {
+    const box = el.getBoundingClientRect();
+    const cue = el.parentElement!.getBoundingClientRect();
+    return { x: box.x, y: box.y, width: box.width, height: box.height, onset: cue.x };
+  }));
+  const labels = await measureLabels();
+  expect(new Set(labels.map(label => label.y)).size).toBe(2);
+  for (const [i, label] of labels.entries()) {
+    expect(label.x + label.width / 2).toBeCloseTo(label.onset, 1);
+    expect(label.height).toBe(22);
+    expect(label.x).toBeGreaterThanOrEqual(0);
+    expect(label.x + label.width).toBeLessThanOrEqual(320);
+    for (const other of labels.slice(0, i)) {
+      expect(label.x < other.x + other.width && label.x + label.width > other.x && label.y < other.y + other.height && label.y + label.height > other.y).toBe(false);
+    }
+  }
+  expect((await current.boundingBox())!.height).toBeLessThan(85);
+  const initialHead = (await current.locator('.rhythm-playhead').boundingBox())!.x;
+  await practiceTime(page, 0.5);
+  expect((await current.locator('.rhythm-playhead').boundingBox())!.x).toBeGreaterThan(initialHead + 10);
+  expect(await measureLabels()).toEqual(labels);
+});
+
 test('bar seeking respects pickups, meter and tempo changes, and separate repeat passes', async ({ page }) => {
   const note = (duration: string, dots = '') => `<Chord><durationType>${duration}</durationType>${dots}<Note><pitch>60</pitch></Note></Chord>`;
   const meter = (numerator: number) => `<TimeSig><sigN>${numerator}</sigN><sigD>4</sigD></TimeSig>`;
