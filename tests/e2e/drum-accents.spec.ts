@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { practiceTime } from './practice-clock';
+import { chooseInstrument } from './instrument-picker';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { Movement } from '../../src/score/model';
@@ -12,7 +14,7 @@ test('Balaklava dynamics change rendered stick heights, with relative accents an
   await expect(page).toHaveURL(/#balaklava$/);
   await expect(page.getByRole('heading', { name: 'Balaklava', exact: true })).toBeVisible();
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Visualise Side Drum' }).click();
+  await chooseInstrument(page, 'Side Drum');
   const targets = await page.evaluate(async () => {
     const modulePath = '/src/score/loader.ts';
     const { loadCatalogue, loadScore } = await import(/* @vite-ignore */ modulePath);
@@ -42,8 +44,7 @@ test('Balaklava dynamics change rendered stick heights, with relative accents an
   expect(targets.ordinary.every(Boolean)).toBe(true);
   expect(targets.rolls.every(Boolean)).toBe(true);
   expect(targets.transitions.length).toBeGreaterThan(1);
-  const seek = page.getByRole('slider', { name: 'Playback position', exact: true });
-  const seekTo = (seconds: number) => seek.fill(String(Number(seconds.toFixed(2))));
+  const seekTo = (seconds: number) => practiceTime(page, Number(seconds.toFixed(2)));
   const angle = (note: Movement) => page.locator(`.snare .${note.hand === 'R' ? 'right' : 'left'}-stick`)
     .evaluate(el => Number((el as SVGElement).style.transform.match(/rotate\(([-\d.]+)deg\)/)![1]));
   for (const [name, viewport] of [['desktop', { width: 1366, height: 900 }], ['phone', { width: 390, height: 844 }]] as const) {
@@ -103,21 +104,20 @@ test('written drum accents prepare higher and sound stronger with unchanged beat
     return timeline.movements.filter((movement: { sourceId: string }) => ids.has(movement.sourceId))
       .map((movement: { time: number; accent?: boolean; velocity: number }) => ({ time: movement.time, accent: !!movement.accent, velocity: movement.velocity }));
   });
-  const seek = page.getByRole('slider', { name: 'Playback position', exact: true });
   const angle = () => page.locator('.snare .right-stick').evaluate(el => Number((el as SVGElement).style.transform.match(/rotate\(([-\d.]+)deg\)/)![1]));
   for (const [name, viewport] of [['desktop', { width: 1366, height: 900 }], ['phone', { width: 390, height: 844 }]] as const) {
     await page.setViewportSize(viewport);
-    await seek.fill((targets[0].time - 0.07).toFixed(2));
+    await practiceTime(page, Number((targets[0].time - 0.07).toFixed(2)));
     // This accent releases a roll: recover smoothly from the final press,
     // reaching full preparation before its shortened downstroke begins.
     expect(await angle()).toBeLessThan(28);
-    await seek.fill(String(Number((targets[0].time - 0.05).toFixed(2))));
+    await practiceTime(page, Number((targets[0].time - 0.05).toFixed(2)));
     expect(await angle()).toBeLessThan(12);
     await page.locator('.visual-panel').scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(tmpdir(), `mcalpine-accent-preparation-${name}.png`) });
-    await seek.fill((targets[2].time - 0.07).toFixed(2));
+    await practiceTime(page, Number((targets[2].time - 0.07).toFixed(2)));
     expect(await angle()).toBeCloseTo(28); // Ordinary right-hand hit uses its normal lift.
-    await seek.fill(targets[0].time.toFixed(2));
+    await practiceTime(page, Number(targets[0].time.toFixed(2)));
     expect(await angle()).toBeCloseTo(47.5);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
@@ -132,7 +132,7 @@ test('written drum accents prepare higher and sound stronger with unchanged beat
       return original.call(this, when, velocity, output);
     };
   });
-  await seek.fill((targets[0].time - 0.01).toFixed(2));
+  await practiceTime(page, Number((targets[0].time - 0.01).toFixed(2)));
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { accentAudio: { strikes: unknown[] } }).accentAudio.strikes.length)).toBeGreaterThanOrEqual(7);
   await page.getByRole('button', { name: 'Pause', exact: true }).click();

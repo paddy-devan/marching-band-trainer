@@ -115,7 +115,9 @@ describe('snare flams', () => {
     expect(cues).toHaveLength(1);
     expect(cues[0].movements[0].flam).toBe('main');
     const html = renderToStaticMarkup(createElement(BarNotes, { score, part, movements, measure: score.measures[0], position: 0, active: [] }));
-    expect(html).toContain('L Flam');
+    const notes = document.createElement('div');
+    notes.innerHTML = html;
+    expect(notes.querySelector('.note-label')?.textContent).toBe('L Flam');
     const lanes = drumLanes(movements);
     expect(drumFrame(lanes, -0.035, 1, DEFAULT_DRUM_TIMING)[1]).toMatchObject({ angle: 47.5, impact: true, buzz: false });
     expect(drumFrame(lanes, 0, 1, DEFAULT_DRUM_TIMING)[0]).toMatchObject({ angle: 47.5, impact: true, buzz: false });

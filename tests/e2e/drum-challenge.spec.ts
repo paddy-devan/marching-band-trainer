@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { practiceTime } from './practice-clock';
 import { zipSync, strToU8 } from 'fflate';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -339,18 +340,19 @@ test('McAlpine labels flams and animates the lead and main hands on desktop and 
   await page.goto('./#mcalpine');
   await expect(page).toHaveTitle('SLSCC Band');
   await expect(page.getByRole('heading', { name: 'McAlpine', exact: true })).toBeVisible();
-  const seek = page.getByRole('slider', { name: 'Playback position', exact: true });
   for (const [label, viewport] of [['desktop', { width: 1366, height: 900 }], ['phone', { width: 390, height: 844 }]] as const) {
     await page.setViewportSize(viewport);
-    await seek.fill('0.19'); // Grace hand is low 25 ms before its contact.
+    await practiceTime(page, 0.19); // Grace hand is low 25 ms before its contact.
     const graceAngle = await page.locator('.snare .left-stick').evaluate(el => Number((el as SVGElement).style.transform.match(/rotate\(([-\d.]+)deg\)/)![1]));
-    expect(graceAngle).toBeCloseTo(39.5);
+    // This grace inherits the accented principal's velocity, reaching the
+    // existing ten-degree grace lift cap (47.5 - 10).
+    expect(graceAngle).toBeCloseTo(37.5);
     await page.locator('.visual-panel').scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(tmpdir(), `mcalpine-flam-preparation-${label}.png`) });
-    await seek.fill('0.22'); // First grace stroke at 0.215; main hit remains at 0.25.
+    await practiceTime(page, 0.22); // First grace stroke at 0.215; main hit remains at 0.25.
     await expect(page.locator('.snare [data-impact="left"]')).toHaveClass(/lit/);
     await expect(page.locator('.snare [data-impact="right"]')).not.toHaveClass(/lit/);
-    await seek.fill('0.25');
+    await practiceTime(page, 0.25);
     await expect(page.locator('.snare [data-impact="right"]')).toHaveClass(/lit/);
     await expect(page.locator('.current .note-cue').first()).toHaveText('R Flam');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

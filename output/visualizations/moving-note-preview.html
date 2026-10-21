@@ -1,0 +1,214 @@
+<div id="moving-note-preview" aria-label="Holyrood moving note preview">
+  <section class="trainer-surface">
+    <header class="trainer-heading"><h2>Holyrood</h2><span>Bell lyre</span></header>
+    <div class="trainer-controls">
+      <button type="button" class="trainer-play cursor-interaction">Play</button>
+      <button type="button" class="trainer-restart cursor-interaction" aria-label="Restart preview"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>Restart</span></button>
+      <span class="trainer-bar" aria-live="polite">Bar 10</span>
+      <label class="trainer-tempo">Tempo<select aria-label="Playback tempo" class="cursor-interaction"><option value="0.5">50%</option><option value="0.6">60%</option><option value="0.8" selected>80%</option><option value="0.9">90%</option><option value="1">100%</option><option value="1.25">125%</option></select></label>
+    </div>
+    <div class="trainer-instrument"><svg class="trainer-lyre" role="img" aria-label="Bell lyre with the current note highlighted"></svg></div>
+    <div class="trainer-lane" role="img" aria-label="Upcoming note letters move from right to left towards a fixed play now marker. Beat numbers show the pulse.">
+      <div class="trainer-track"></div>
+      <div class="trainer-now"><span>Play now</span></div>
+    </div>
+    <div class="trainer-status" aria-live="polite"></div>
+  </section>
+</div>
+<style>
+#moving-note-preview {
+  --trainer-paper: light-dark(#ffffff, #14232d);
+  --trainer-ink: light-dark(#243642, #e8eff3);
+  --trainer-muted: light-dark(#667985, #a3b4c0);
+  --trainer-line: light-dark(#d9e2e8, #354a57);
+  --trainer-metal: light-dark(#edf1f3, #2c404d);
+  --trainer-shine: light-dark(#ffffff, #708591);
+  --trainer-frame: light-dark(#98a9b4, #8399a6);
+  --trainer-accent: light-dark(#007a94, #82d1e3);
+  --trainer-selected: light-dark(#e5f7fb, #254956);
+  --trainer-button: light-dark(#007a94, #a1deeb);
+  --trainer-button-ink: light-dark(#ffffff, #133440);
+  width: 100%; color: var(--trainer-ink); font: 400 14px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+#moving-note-preview * { box-sizing: border-box; }
+#moving-note-preview [hidden] { display:none; }
+#moving-note-preview .trainer-surface { background: var(--trainer-paper); border: 1px solid var(--trainer-line); border-radius: 14px; overflow: hidden; }
+#moving-note-preview .trainer-heading { display:flex; align-items:baseline; gap:12px; margin:0 20px; padding:17px 0 13px; border-bottom:1px solid var(--trainer-line); }
+#moving-note-preview h2 { font:500 18px/1.3 system-ui, sans-serif; margin:0; }
+#moving-note-preview .trainer-heading > span { color:var(--trainer-muted); font-size:14px; }
+#moving-note-preview .trainer-controls { display:flex; align-items:center; gap:10px; padding:12px 20px 0; min-width:0; }
+#moving-note-preview button, #moving-note-preview select { font:500 14px/1.2 system-ui,sans-serif; border:1px solid var(--trainer-line); border-radius:7px; background:var(--trainer-paper); color:var(--trainer-ink); min-height:40px; }
+#moving-note-preview button { padding:0 13px; display:inline-flex; align-items:center; justify-content:center; gap:7px; }
+#moving-note-preview .trainer-play { background:var(--trainer-button); color:var(--trainer-button-ink); border-color:transparent; min-width:70px; }
+#moving-note-preview .trainer-restart { background:transparent; border-color:transparent; padding:0 7px; }
+#moving-note-preview .trainer-restart svg { width:16px; height:16px; }
+#moving-note-preview .trainer-bar { color:var(--trainer-muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+#moving-note-preview .trainer-tempo { margin-left:auto; display:flex; align-items:center; gap:8px; color:var(--trainer-muted); }
+#moving-note-preview select { padding:0 6px; min-width:76px; font-variant-numeric:tabular-nums; }
+#moving-note-preview .trainer-instrument { height:318px; position:relative; margin:4px 16px 0; }
+#moving-note-preview .trainer-lyre { display:block; width:100%; height:100%; }
+#moving-note-preview .trainer-lyre .lyre-rail { stroke:var(--trainer-frame); stroke-width:6; }
+#moving-note-preview .trainer-lyre .lyre-frame { fill:none; stroke:var(--trainer-frame); stroke-width:9; }
+#moving-note-preview .trainer-lyre .lyre-frame-shine { fill:none; stroke:var(--trainer-shine); stroke-width:2.2; opacity:.75; }
+#moving-note-preview .trainer-lyre .lyre-bar { fill:var(--trainer-metal); stroke:var(--trainer-frame); stroke-width:1.5; }
+#moving-note-preview .trainer-lyre .lyre-bar.active { fill:var(--trainer-selected); stroke:var(--trainer-accent); stroke-width:3; }
+#moving-note-preview .trainer-lyre text { fill:var(--trainer-ink); font-family:system-ui,sans-serif; }
+#moving-note-preview .trainer-lyre .beater line { stroke:var(--trainer-accent); stroke-width:4; stroke-linecap:round; }
+#moving-note-preview .trainer-lyre .beater circle { fill:var(--trainer-accent); }
+#moving-note-preview .trainer-lane { position:relative; height:121px; margin:0 20px 8px; overflow:hidden; border-top:1px solid var(--trainer-line); }
+#moving-note-preview .trainer-track { position:absolute; inset:0; }
+#moving-note-preview .trainer-tick { position:absolute; top:39px; height:57px; width:1px; background:var(--trainer-line); }
+#moving-note-preview .trainer-tick.strong { height:65px; top:31px; }
+#moving-note-preview .trainer-tick > span { position:absolute; top:-23px; left:0; transform:translateX(-50%); color:var(--trainer-muted); font-size:12px; font-variant-numeric:tabular-nums; }
+#moving-note-preview .trainer-tick.strong > span { top:-15px; }
+#moving-note-preview .trainer-note { position:absolute; top:49px; width:44px; height:30px; margin-left:-22px; border-radius:6px; display:flex; align-items:center; justify-content:center; gap:1px; background:var(--trainer-paper); color:var(--trainer-ink); font-weight:500; font-size:16px; }
+#moving-note-preview .trainer-note small { align-self:center; font-size:11px; padding-top:5px; }
+#moving-note-preview .trainer-note[hidden] { display:none; }
+#moving-note-preview .trainer-note.active { background:var(--trainer-selected); color:var(--trainer-accent); }
+#moving-note-preview .trainer-duration { position:absolute; top:86px; height:3px; border-radius:2px; background:var(--trainer-line); }
+#moving-note-preview .trainer-duration.active { background:var(--trainer-accent); }
+#moving-note-preview .trainer-now { position:absolute; top:35px; bottom:16px; width:2px; left:60px; background:var(--trainer-accent); pointer-events:none; }
+#moving-note-preview .trainer-now:after { content:""; position:absolute; top:48px; left:-3px; width:8px; height:8px; border-radius:50%; background:var(--trainer-accent); }
+#moving-note-preview .trainer-now > span { position:absolute; top:-26px; left:0; transform:translateX(-50%); white-space:nowrap; font-size:12px; font-weight:500; color:var(--trainer-accent); background:var(--trainer-paper); padding:0 5px; }
+#moving-note-preview .trainer-status { padding:0 20px; color:var(--trainer-muted); font-size:13px; }
+#moving-note-preview .trainer-status:empty { display:none; }
+#moving-note-preview .trainer-status:not(:empty) { padding-bottom:12px; }
+@media (max-width:450px) {
+  #moving-note-preview .trainer-heading { margin:0 12px; padding:13px 0 10px; }
+  #moving-note-preview .trainer-controls { gap:4px; padding:10px 12px 0; }
+  #moving-note-preview button, #moving-note-preview select { min-height:44px; }
+  #moving-note-preview .trainer-play { min-width:62px; padding:0 11px; }
+  #moving-note-preview .trainer-restart { width:40px; padding:0; }
+  #moving-note-preview .trainer-restart span { display:none; }
+  #moving-note-preview .trainer-tempo { font-size:0; gap:0; }
+  #moving-note-preview select { font-size:16px; min-width:81px; }
+  #moving-note-preview .trainer-bar { font-size:13px; margin-left:2px; }
+  #moving-note-preview .trainer-instrument { height:280px; margin:2px 4px 0; }
+  #moving-note-preview .trainer-lane { margin:0 12px 4px; }
+}
+</style>
+<script>
+(() => {
+  const root=document.getElementById('moving-note-preview');
+  const q=s=>root.querySelector(s);
+  const notes=[
+    [0,.5172,87,'D♯6'],[.5172,.3448,99,'D♯7'],[.8621,.1724,98,'D7'],[1.0345,.5172,99,'D♯7'],[1.5517,.3448,96,'C7'],[1.8966,.1724,97,'C♯7'],
+    [2.069,.5172,99,'D♯7'],[2.5862,.5172,101,'F7'],[3.4483,.1724,99,'D♯7'],[3.6207,.3448,96,'C7'],[3.9655,.1724,92,'G♯6'],
+    [4.1379,.3448,91,'G6'],[4.4828,.1724,92,'G♯6'],[4.6552,.3448,91,'G6'],[5,.1724,92,'G♯6'],[5.1724,.3448,89,'F6'],[5.5172,.1724,91,'G6'],[5.6897,.3448,89,'F6'],[6.0345,.1724,91,'G6'],
+    [6.2069,.5172,87,'D♯6'],[6.7241,.5172,89,'F6'],[7.2414,.5172,91,'G6'],[7.7586,.5172,92,'G♯6']
+  ];
+  const beats=[0,.5172,1.0345,1.5517,2.069,2.5862,3.1034,3.6207,4.1379,4.6552,5.1724,5.6897,6.2069,6.7241,7.2414,7.7586,8.2759];
+  const bars=[0,2.069,4.1379,6.2069];
+  const end=8.2759;
+  const state={position:0,tempo:.8,playing:false};
+  const session=Math.random().toString(36).slice(2);
+  const design={spacing:300,instrumentHeight:318};
+  const svg=q('.trainer-lyre'),track=q('.trainer-track'),lane=q('.trainer-lane'),play=q('.trainer-play'),tempo=q('select'),barLabel=q('.trainer-bar');
+  const namespace='http://www.w3.org/2000/svg';
+  const natural=[0,2,4,5,7,9,11],names=['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+  const slot=p=>Math.floor(p/12)*7+natural.filter(n=>n<=p%12).length-1+(natural.includes(p%12)?0:.5);
+  const geometry=Array.from({length:25},(_,i)=>{
+    const pitch=81+i,accidental=!natural.includes(pitch%12),ratio=(slot(pitch)-slot(81))/(slot(105)-slot(81)),width=188-ratio*80;
+    return {pitch,x:accidental?234-width:250,y:568-ratio*496,width,accidental};
+  });
+  let request=0,last=0,current=-2,scale=1,lyreGroup,beater,now=60;
+  const barRects=new Map();
+  const tokenNodes=notes.map(([time,duration,pitch,label])=>{
+    const line=document.createElement('div');line.className='trainer-duration';line.setAttribute('aria-hidden','true');track.append(line);
+    const token=document.createElement('div');token.className='trainer-note';token.innerHTML=label.slice(0,-1)+'<small>'+label.slice(-1)+'</small>';track.append(token);
+    return {token,line};
+  });
+  const tickNodes=beats.map((time,i)=>{
+    const tick=document.createElement('div');tick.className='trainer-tick'+(i%4===0?' strong':'');
+    const label=document.createElement('span');label.textContent=String(i%4+1);tick.append(label);track.prepend(tick);return tick;
+  });
+  function element(name,attrs,parent) {
+    const node=document.createElementNS(namespace,name);Object.entries(attrs).forEach(([key,value])=>node.setAttribute(key,String(value)));parent.append(node);return node;
+  }
+  function buildLyre() {
+    const w=svg.clientWidth,h=svg.clientHeight;
+    if(!w||!h)return;
+    scale=Math.min(h/660,(w-8)/540);
+    svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.replaceChildren();barRects.clear();
+    lyreGroup=element('g',{transform:`translate(${w/2-240*scale} 0) scale(${scale})`},svg);
+    [true,false].forEach(accidental=>{
+      const column=geometry.filter(b=>b.accidental===accidental),low=column[0],high=column.at(-1);
+      [.23,.77].forEach(o=>element('line',{x1:high.x+high.width*o,y1:high.y-24,x2:low.x+low.width*o,y2:low.y+48,class:'lyre-rail'},lyreGroup));
+    });
+    const frame='M20.65 94.95 A44 44 0 0 1 105.29 117.89 L24 555 C8 611 47 640 117 642 Q240 655 363 642 C433 640 472 611 456 555 L374.71 117.89 A44 44 0 0 1 459.35 94.95';
+    element('path',{d:frame,class:'lyre-frame'},lyreGroup);element('path',{d:frame,class:'lyre-frame-shine',transform:'translate(-1.2 -1)'},lyreGroup);
+    geometry.forEach(b=>{
+      const rect=element('rect',{x:b.x,y:b.y,width:b.width,height:28,rx:1,class:'lyre-bar'},lyreGroup);barRects.set(b.pitch,rect);
+      const text=element('text',{x:b.accidental?b.x+b.width-8:b.x+8,y:b.y+21,'text-anchor':b.accidental?'end':'start','font-size':12/scale},lyreGroup);
+      text.textContent=names[b.pitch%12];
+      const octave=element('tspan',{'font-size':11/scale,dy:1},text);octave.textContent=String(Math.floor(b.pitch/12)-1);
+    });
+    beater=element('g',{class:'beater'},lyreGroup);element('line',{x1:0,y1:0,x2:-32,y2:49},beater);element('circle',{cx:0,cy:0,r:7},beater);
+    current=-2;render();
+  }
+  function render() {
+    const t=state.position,w=lane.clientWidth;
+    now=w<400?48:60;q('.trainer-now').style.left=now+'px';
+    const active=notes.findIndex(n=>t>=n[0]-.00001&&t<n[0]+n[1]-.00001);
+    tokenNodes.forEach(({token,line},i)=>{
+      const n=notes[i],x=now+(n[0]-t)*design.spacing,length=n[1]*design.spacing-5;
+      token.style.transform=`translateX(${x}px)`;line.style.transform=`translateX(${x}px)`;
+      token.hidden=x<22||x>w-22;line.hidden=x+length<0||x>w;
+      line.style.width=length+'px';token.classList.toggle('active',i===active);line.classList.toggle('active',i===active);
+    });
+    tickNodes.forEach((tick,i)=>{
+      const x=now+(beats[i]-t)*design.spacing;
+      tick.style.transform=`translateX(${x}px)`;tick.hidden=x<0||x>w;
+      tick.firstElementChild.hidden=x<14||x>w-14||Math.abs(x-now)<38;
+    });
+    if(active!==current) {
+      current=active;
+      barRects.forEach((r,p)=>r.classList.toggle('active',active>=0&&p===notes[active][2]));
+      const n=active>=0?notes[active]:null;
+      if(n&&beater){const b=geometry.find(g=>g.pitch===n[2]);beater.setAttribute('transform',`translate(${b.x+b.width*.52} ${b.y+9})`);}
+      if(beater)beater.style.visibility=n?'visible':'hidden';
+    }
+    const bar=10+Math.max(0,bars.findLastIndex(start=>t>=start));
+    if(barLabel.textContent!==`Bar ${bar}`)barLabel.textContent=`Bar ${bar}`;
+    play.textContent=state.playing?'Pause':'Play';
+    play.setAttribute('aria-label',state.playing?'Pause preview':'Play preview');
+    tempo.value=String(state.tempo);
+    q('.trainer-status').textContent=t>=end?'End of preview':'';
+  }
+  function save() {
+    if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:{preview:'Moving note lane',tempo:Math.round(state.tempo*100)},privateContent:{position:state.position,tempo:state.tempo,source:session}}).catch(()=>{});
+  }
+  function tick(stamp) {
+    if(!state.playing)return;
+    state.position=Math.min(end,state.position+Math.min((stamp-last)/1000,.1)*state.tempo);last=stamp;
+    if(state.position>=end)state.playing=false;
+    render();if(state.playing)request=requestAnimationFrame(tick);else save();
+  }
+  function restore(saved) {
+    if(!saved?.privateContent)return;
+    const data=saved.privateContent;
+    if(data.source===session)return;
+    if(typeof data.tempo==='number'&&[.5,.6,.8,.9,1,1.25].includes(data.tempo))state.tempo=data.tempo;
+    if(typeof data.position==='number')state.position=Math.max(0,Math.min(end,data.position));
+    state.playing=false;cancelAnimationFrame(request);render();
+  }
+  play.addEventListener('click',()=>{
+    if(state.position>=end)state.position=0;
+    state.playing=!state.playing;cancelAnimationFrame(request);
+    if(state.playing){last=performance.now();request=requestAnimationFrame(tick);}
+    render();save();
+  });
+  q('.trainer-restart').addEventListener('click',()=>{state.position=0;last=performance.now();render();save();});
+  tempo.addEventListener('change',()=>{state.tempo=Number(tempo.value);last=performance.now();render();save();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.playing){state.playing=false;cancelAnimationFrame(request);render();save();}});
+  window.addEventListener('openai:set_globals',event=>restore(event.detail?.globals?.widgetState));
+  new ResizeObserver(buildLyre).observe(svg);
+  new ResizeObserver(render).observe(lane);
+  restore(window.openai?.widgetState);buildLyre();
+  if(globalThis.Tweak){
+    const tweak=new Tweak({container:root,onChange:()=>{if(window.innerWidth>450)q('.trainer-instrument').style.height=design.instrumentHeight+'px';buildLyre();render();}});
+    tweak.addSlider(design,'spacing',{label:'Timing lane spacing',min:280,max:420,step:10,unit:'px/s'});
+    tweak.addSlider(design,'instrumentHeight',{label:'Lyre height',min:280,max:380,step:10,unit:'px'});
+  }
+})();
+</script>

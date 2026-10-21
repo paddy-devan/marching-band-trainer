@@ -143,15 +143,16 @@ function Snare({ active, position, movements = active, speed = 1, playing = fals
   const neutral = frame ? frame[2].impact : hands.has(undefined);
   const rolls = new Set(active.filter(m => m.roll).map(m => m.hand));
   return <svg ref={svg} viewBox={closeUp ? '40 50 400 275' : '0 0 480 360'} role="img" aria-label={`Side drum: ${active.length ? active.map(m => `${m.hand || 'unspecified hand'}${m.roll ? ' roll' : ''}`).join(', ') : 'rest'}`} className={`instrument-svg snare${drumTiming ? ' calibrated' : ''}`}>
-    <defs><clipPath id={headClip}><ellipse cx="240" cy="156" rx="140" ry="64" /></clipPath></defs>
+    <defs><clipPath id={headClip}><ellipse cx="240" cy="156" rx="147" ry="74" /></clipPath></defs>
     <path d="M100 170 H380 V246 A147 74 0 0 1 100 246 Z" className="drum-shell" />
     <path d="M100 170 V246 M380 170 V246" className="snare-body-edge" />
-    <ellipse cx="240" cy="156" rx="140" ry="64" className="snare-recess" />
-    {/* The recessed head stays inside the opening; the hoop is drawn over it. */}
+    <ellipse cx="240" cy="156" rx="147" ry="74" className="snare-recess" />
+    {/* The hoop overlays the clipped head and defines the visible opening. */}
     <ellipse cx="240" cy="172" rx="140" ry="64" className="drum-head" clipPath={`url(#${headClip})`} />
-    <path d="M93 156 a147 74 0 1 1 294 0 a147 74 0 1 1 -294 0 Z M100 156 a140 64 0 1 1 280 0 a140 64 0 1 1 -280 0 Z" fillRule="evenodd" className="snare-rim-top" />
     <path d="M93 156 A147 74 0 0 0 387 156 V182 A147 74 0 0 1 93 182 Z" className="snare-rim-band" />
-    <path d="M93 156 A147 74 0 0 0 387 156" className="snare-rim-edge" />
+    {/* Shared centreline and constant-width strokes keep both edges parallel. */}
+    <ellipse cx="240" cy="156" rx="143.5" ry="70.5" className="snare-rim-outline" />
+    <ellipse cx="240" cy="156" rx="143.5" ry="70.5" className="snare-rim-top" />
     <circle data-impact="left" cx="176" cy="173" r={left ? 23 : 13} className={`strike ${left ? 'lit left' : ''}`} />
     <circle data-impact="right" cx="304" cy="173" r={right ? 23 : 13} className={`strike ${right ? 'lit right' : ''}`} />
     <circle data-impact="neutral" cx="240" cy="173" r="19" className={`strike${neutral ? ' lit neutral' : ''}`} style={{ display: neutral ? undefined : 'none' }} />

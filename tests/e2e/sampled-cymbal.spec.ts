@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { practiceTime } from './practice-clock';
 
 test('a soloed sampled cymbal sounds in practice and its ringing tail obeys mute and pause', async ({ page }) => {
   const errors: string[] = [];
@@ -26,6 +27,7 @@ test('a soloed sampled cymbal sounds in practice and its ringing tail obeys mute
     };
   });
   await page.goto('./#heart-of-oak');
+  await page.locator('.part-controls summary').click();
   await expect(page.getByRole('button', { name: 'Solo Cymbal', exact: true })).toBeVisible();
   const firstCrash = await page.evaluate(async () => {
     const modulePath = '/src/score/loader.ts';
@@ -37,7 +39,7 @@ test('a soloed sampled cymbal sounds in practice and its ringing tail obeys mute
   });
   const rms = () => page.evaluate(() => (window as unknown as { cymbalRms?: () => number }).cymbalRms?.() || 0);
   await page.getByRole('button', { name: 'Solo Cymbal', exact: true }).click();
-  await page.getByRole('slider', { name: 'Playback position' }).fill(Math.max(0, firstCrash - 0.1).toFixed(2));
+  await practiceTime(page, Math.max(0, firstCrash - 0.1));
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect.poll(rms, { intervals: [20] }).toBeGreaterThan(0.001);
   await page.getByRole('button', { name: 'Mute Cymbal', exact: true }).click();
@@ -173,11 +175,11 @@ test('Captain General dynamics change level and brightness, and its tied crash r
     expect(result.unchangedPitch).toBe(true);
     expect(result.finite).toBe(true);
   }
+  await page.locator('.part-controls summary').click();
   await page.getByRole('button', { name: /^Solo .*Cymbal/i }).click();
   await expect(page.getByRole('button', { name: /^Solo .*Cymbal/i })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
-  const seek = page.getByRole('slider', { name: 'Playback position' });
-  await expect.poll(async () => Number(await seek.inputValue())).toBeGreaterThan(0.1);
+  await expect.poll(() => practiceTime(page)).toBeGreaterThan(0.1);
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await page.getByRole('button', { name: '50%', exact: true }).click();
   await expect(page.locator('#speed')).toHaveValue('50');

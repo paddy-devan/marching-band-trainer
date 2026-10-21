@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { interpretScore, secondsAt } from '../src/score/interpret';
 import { parseScore } from '../src/score/parser';
-import { BarNotes, barCues } from '../src/ui/BarNotes';
+import { BarNotes, barCues, barRhythm, fitRhythmLabels } from '../src/ui/BarNotes';
 import { highlightedMovements } from '../src/ui/cues';
 import { chord, fixture, measure, synthetic, tempo, time } from './helpers';
 
@@ -69,7 +69,9 @@ describe('bar cues and shared strike highlights', () => {
     expect(cues.map(c => c.movements.map(m => m.pitch))).toEqual([[60, 64], [], [67]]);
     expect(cues.map(c => [c.start, c.end])).toEqual([[0, 0.5], [0.5, 1], [1, 2]]);
     const html = renderToStaticMarkup(createElement(BarNotes, { score, part: score.parts[0], movements, measure: score.measures[0], position: 0.75, active: [] }));
-    expect(html).toContain('rest" aria-current="true"><span>Rest');
+    const notes = document.createElement('div');
+    notes.innerHTML = html;
+    expect(notes.querySelector('.rest[aria-current="true"]')?.textContent).toBe('Rest');
     expect(html).toContain('End of score');
   });
 
@@ -82,6 +84,10 @@ describe('bar cues and shared strike highlights', () => {
     expect(highlightedMovements(movements, 1.99)).toEqual(movements);
     expect(highlightedMovements(movements, 2)).toEqual(movements);
     expect(barCues(score, movements, score.measures[1])).toEqual([{ start: 2, end: 4, movements }]);
+    const notes = document.createElement('div');
+    notes.innerHTML = renderToStaticMarkup(createElement(BarNotes, { score, part: score.parts[0], movements, measure: score.measures[1], position: 2, active: movements }));
+    expect(notes.querySelector('.held .note-label')?.textContent).toBe('C4Hold');
+    expect(notes.querySelector('.held')?.getAttribute('aria-label')).toContain('Hold C4, beat 1');
   });
 
   it('queues the repeated bar after the first ending', () => {
@@ -90,5 +96,94 @@ describe('bar cues and shared strike highlights', () => {
     const html = renderToStaticMarkup(createElement(BarNotes, { score, part: score.parts[0], movements: movements.filter(m => m.partId === score.parts[0].id), measure: bar, position: 0, active: [] }));
     expect(html).toContain('Current bar 10');
     expect(html).toContain('Next bar 3');
+  });
+});
+
+describe('beat-proportional bar layout', () => {
+  it('keeps sparse lyre letters level regardless of pitch', () => {
+    const { score, movements } = interpretScore(parseScore(synthetic([
+      measure(time() + tempo(120) + chord('quarter', 57) + chord('quarter', 69) + chord('half', 81)) + measure(chord('whole', 69)),
+    ], ['Bell Lyre']), 'contour'));
+    const part = score.parts[0];
+    const current = barRhythm(score, part, movements, score.measures[0]);
+    const next = barRhythm(score, part, movements, score.measures[1]);
+    const currentLabels = fitRhythmLabels(current.cues, 400);
+    expect(new Set(currentLabels.map(label => label.y)).size).toBe(1);
+    expect(fitRhythmLabels(next.cues, 400)[0].y).toBe(currentLabels[0].y);
+  });
+
+  it.each([
+    ['the-captain-general', 0, 238, 2],
+    ['the-captain-general', 1, 238, 2],
+    ['colonel-bogey', 1, 206, 3],
+  ] as const)('keeps %s bar %i at exact onsets with readable staggered labels', (name, bar, width, rows) => {
+    const { score, movements } = interpretScore(fixture(name));
+    const part = score.parts.find(part => part.renderer === 'lyre')!;
+    const rhythm = barRhythm(score, part, movements.filter(movement => movement.partId === part.id), score.measures[bar]);
+    const onsets = rhythm.cues.map(cue => cue.offset);
+    const fitted = fitRhythmLabels(rhythm.cues, width);
+    expect(new Set(fitted.map(label => label.y)).size).toBe(rows);
+    for (const [index, label] of fitted.entries()) {
+      expect(label.x).toBeCloseTo(label.cue.offset * width, 8);
+      expect(label.height).toBe(22);
+      for (const previous of fitted.slice(0, index)) {
+        const overlapX = label.x - label.width / 2 < previous.x + previous.width / 2;
+        if (label.row === previous.row) expect(overlapX).toBe(false);
+        else if (overlapX) {
+          const overlapY = Math.min(label.y + label.height, previous.y + previous.height) - Math.max(label.y, previous.y);
+          expect(overlapY).toBeLessThanOrEqual(2);
+        }
+      }
+    }
+    expect(rhythm.cues.map(cue => cue.offset)).toEqual(onsets);
+  });
+
+  it('keeps beat spacing uniform through a tempo change inside a bar', () => {
+    const { score, movements } = interpretScore(parseScore(synthetic([
+      measure(time() + tempo(120) + chord() + tempo(60) + chord() + chord('half')),
+    ]), 'rhythm'));
+    const rhythm = barRhythm(score, score.parts[0], movements, score.measures[0]);
+    expect(rhythm.cues.map(cue => cue.start)).toEqual([0, 0.5, 1.5]);
+    expect(rhythm.cues.map(cue => cue.offset)).toEqual([0, 0.25, 0.5]);
+    expect(rhythm.cues.map(cue => cue.span)).toEqual([0.25, 0.25, 0.5]);
+    expect(rhythm.beats.filter(beat => beat.label).map(beat => [beat.label, beat.offset])).toEqual([
+      ['1', 0], ['2', 0.25], ['3', 0.5], ['4', 0.75],
+    ]);
+  });
+
+  it('preserves dotted durations, silent gaps and a fractional playhead position', () => {
+    const { score, movements } = interpretScore(parseScore(synthetic([
+      measure(time() + tempo(120) + chord('quarter', 60, '<dots>1</dots>') + '<Rest><durationType>eighth</durationType></Rest>' + chord('half')),
+    ]), 'rhythm'));
+    const rhythm = barRhythm(score, score.parts[0], movements, score.measures[0]);
+    expect(rhythm.cues.map(cue => [cue.offset, cue.span, cue.labels.length])).toEqual([
+      [0, 0.375, 1], [0.375, 0.125, 0], [0.5, 0.5, 1],
+    ]);
+    const notes = document.createElement('div');
+    notes.innerHTML = renderToStaticMarkup(createElement(BarNotes, { score, part: score.parts[0], movements, measure: score.measures[0], position: 0.875, active: [] }));
+    expect((notes.querySelector('.rhythm-playhead') as HTMLElement).style.left).toBe('43.75%');
+  });
+
+  it('spaces triplets evenly within their beat without quantizing to the subdivision grid', () => {
+    const tuplet = '<Tuplet><normalNotes>2</normalNotes><actualNotes>3</actualNotes><baseNote>eighth</baseNote></Tuplet>';
+    const { score, movements } = interpretScore(parseScore(synthetic([
+      measure(time() + tempo(120) + tuplet + chord('eighth').repeat(3) + '<endTuplet/>' + chord('half', 62, '<dots>1</dots>')),
+    ]), 'rhythm'));
+    const rhythm = barRhythm(score, score.parts[0], movements, score.measures[0]);
+    [0, 1 / 12, 1 / 6, 0.25].forEach((offset, i) => expect(rhythm.cues[i].offset).toBeCloseTo(offset, 10));
+  });
+
+  it('places a compound-meter pickup at the end of the bar without inventing rests', () => {
+    const { score, movements } = interpretScore(fixture('ready-aye-ready'));
+    const part = score.parts.find(part => part.renderer === 'snare')!;
+    const notes = movements.filter(m => m.partId === part.id);
+    const pickup = barRhythm(score, part, notes, score.measures[0]);
+    expect(pickup.pickup).toBe(true);
+    expect(pickup.cues).toHaveLength(1);
+    expect(pickup.cues[0].offset).toBeCloseTo(5 / 6, 10);
+    expect(pickup.cues[0].span).toBeCloseTo(1 / 6, 10);
+    const fullBar = barRhythm(score, part, notes, score.measures[1]);
+    expect(fullBar.beats.filter(beat => beat.label).map(beat => [beat.label, beat.offset])).toEqual([['1', 0], ['2', 0.5]]);
+    expect(fullBar.beats.some(beat => Math.abs(beat.offset - 1 / 6) < 1e-8 && !beat.major)).toBe(true);
   });
 });
