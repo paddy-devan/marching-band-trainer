@@ -127,7 +127,6 @@ function RhythmRow({ rhythm, bar, queued = false, progress, position, lit }: Row
         const played = !queued && position >= cue.end;
         const description = `${cue.held ? 'Hold ' : ''}${cue.labels.join(', ') || 'Rest'}, beat ${Number((1 + cue.offset * beatsPerBar).toFixed(2))}, ${Number((cue.span * beatsPerBar).toFixed(2))} beats long`;
         return <li key={`${cue.start}:${index}`} className={`note-cue ${sounding || resting ? 'lit' : ''} ${played ? 'played' : ''} ${!cue.movements.length ? 'rest' : ''}${cue.held ? ' held' : ''}`} style={{ left: `${cue.offset * 100}%`, width: `${cue.span * 100}%` }} aria-label={description} aria-current={sounding || resting ? 'true' : undefined}>
-          <span className="cue-duration" aria-hidden="true" />
           {cue.labels.length ? (() => {
             const { width: labelWidth, height: labelHeight } = labelSize(cue);
             const fitted = labelPositions.get(cue);

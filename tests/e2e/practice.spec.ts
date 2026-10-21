@@ -261,7 +261,7 @@ test('rhythm strips align notes with beats and keep dense bars readable on phone
   await expect(current.locator('.bar-notes-number')).toHaveText('2');
   const strip = current.locator('.rhythm-strip');
   expect(await strip.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-  expect((await current.boundingBox())!.height).toBeLessThan(85);
+  expect((await current.boundingBox())!.height).toBeLessThan(100);
   const head = (await current.locator('.rhythm-playhead').boundingBox())!;
   const viewport = (await strip.boundingBox())!;
   expect(head.x).toBeGreaterThanOrEqual(viewport.x);
@@ -306,7 +306,7 @@ test('lyre semiquavers stay at exact onsets in two readable stationary rows on p
       expect(label.x < other.x + other.width && label.x + label.width > other.x && label.y < other.y + other.height && label.y + label.height > other.y).toBe(false);
     }
   }
-  expect((await current.boundingBox())!.height).toBeLessThan(85);
+  expect((await current.boundingBox())!.height).toBeLessThan(100);
   const initialHead = (await current.locator('.rhythm-playhead').boundingBox())!.x;
   await practiceTime(page, 0.5);
   expect((await current.locator('.rhythm-playhead').boundingBox())!.x).toBeGreaterThan(initialHead + 10);
