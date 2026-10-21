@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Transport, type Mix } from '../audio/transport';
 import type { Timeline } from '../score/model';
 import { positionAt } from '../score/interpret';
@@ -16,6 +16,8 @@ export function Practice({ timeline, onChallenge }: { timeline: Timeline; onChal
   const [transport] = useState(() => new Transport(timeline));
   const state = useSyncExternalStore(transport.subscribe, transport.getSnapshot);
   const [selected, setSelected] = useState(score.parts[0].id);
+  const pointerSelection = useRef(false);
+  const hasMultipleParts = score.parts.length > 1;
   const [mix, setMix] = useState<Mix>(() => Object.fromEntries(score.parts.map(p => [p.id, { muted: false, solo: false }])));
   const [timing] = useState(() => {
     try { return parseDrumTiming(localStorage.getItem(DRUM_TIMING_STORAGE_KEY)); }
@@ -37,14 +39,21 @@ export function Practice({ timeline, onChallenge }: { timeline: Timeline; onChal
     <div className="practice-grid">
       <section className="visual-panel" aria-labelledby="visual-title">
         <div className="visual-heading">
-          <h2 id="visual-title" className="sr-only">{part.name}</h2>
-          <div className="instrument-select">
+          <h2 id="visual-title" className={hasMultipleParts ? 'sr-only' : 'instrument-name'}>{part.name}</h2>
+          {hasMultipleParts ? <div className="instrument-select">
             <label htmlFor="visual-part" className="sr-only">Visualised instrument</label>
-            <select id="visual-part" value={selected} onChange={e => setSelected(e.target.value)}>
+            <select id="visual-part" value={selected}
+              onPointerDown={() => { pointerSelection.current = true; }}
+              onKeyDown={() => { pointerSelection.current = false; }}
+              onBlur={() => { pointerSelection.current = false; }}
+              onChange={e => {
+                setSelected(e.currentTarget.value);
+                if (pointerSelection.current) e.currentTarget.blur();
+              }}>
               {score.parts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
-          </div>
+          </div> : null}
         </div>
         <div className="instrument-stage"><InstrumentView part={part} active={active} position={state.position} movements={partMovements} speed={state.speed} playing={state.playing} drumTiming={timing} readPosition={readPosition} /></div>
         <BarNotes score={score} part={part} movements={partMovements} measure={measure} position={state.position} active={active} />

@@ -7,6 +7,40 @@ import { strToU8, zipSync } from 'fflate';
 
 const scoreCount = readdirSync('scores').filter(file => file.endsWith('.mscz')).length;
 
+test('instrument selection releases pointer focus and retains keyboard focus', async ({ page }) => {
+  await page.goto('./#colonel-bogey');
+  const picker = page.getByRole('combobox', { name: 'Visualised instrument' });
+  for (const pointerType of ['mouse', 'touch']) {
+    await picker.focus();
+    await picker.dispatchEvent('pointerdown', { pointerType });
+    await picker.selectOption({ label: pointerType === 'mouse' ? 'Side Drum' : 'Bell Lyre' });
+    await expect(picker).not.toBeFocused();
+  }
+  await picker.focus();
+  // Native type-ahead commits a keyboard choice without opening an OS popup.
+  await picker.press('s');
+  await expect(picker.locator('option:checked')).toHaveText('Side Drum');
+  await expect(picker).toBeFocused();
+  await expect(page.locator('.snare')).toBeVisible();
+  await picker.press('Tab');
+  await expect(picker).not.toBeFocused();
+});
+
+test('single-part pieces have a static instrument heading with the same header height', async ({ page }) => {
+  for (const width of [320, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('./#colonel-bogey');
+    await expect(page.getByRole('combobox', { name: 'Visualised instrument' })).toBeVisible();
+    const height = (await page.locator('.visual-heading').boundingBox())!.height;
+    await page.goto('./#mcalpine');
+    await expect(page.locator('.visual-heading').getByRole('heading', { name: 'Side Drum' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Visualised instrument' })).toHaveCount(0);
+    await expect(page.locator('.instrument-select')).toHaveCount(0);
+    expect((await page.locator('.visual-heading').boundingBox())!.height).toBe(height);
+    await expect(page.locator('.snare')).toBeVisible();
+  }
+});
+
 test('desktop practice controls change real playback and keep following independent of listening', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
