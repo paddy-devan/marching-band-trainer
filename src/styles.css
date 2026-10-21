@@ -79,9 +79,15 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .visual-heading { display: flex; align-items: center; padding: 8px 20px; border-bottom: 1px solid var(--line); }
 .instrument-name { display: flex; align-items: center; min-height: 44px; font-family: inherit; font-size: 16px; font-weight: 650; }
 .instrument-select { position: relative; max-width: 100%; min-width: 0; }
-.instrument-select select { display: block; width: 100%; min-height: 44px; appearance: none; background: transparent; border: 0; border-radius: 4px; color: var(--ink); padding: 8px 28px 8px 0; font-size: 16px; font-weight: 650; text-overflow: ellipsis; cursor: pointer; }
-.instrument-select select:hover { background: var(--surface); }
-.instrument-select svg { position: absolute; pointer-events: none; right: 4px; top: 13px; width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.instrument-trigger { position: relative; display: block; width: 100%; min-height: 44px; background: transparent; border: 0; border-radius: 4px; color: var(--ink); padding: 8px 28px 8px 0; font-size: 16px; font-weight: 650; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: none; }
+.instrument-trigger:hover { background: var(--surface); }
+.instrument-select svg { flex-shrink: 0; pointer-events: none; width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.instrument-trigger > svg { position: absolute; right: 4px; top: 13px; }
+.instrument-options { position: absolute; z-index: 5; top: 100%; left: -6px; min-width: 100%; width: max-content; max-width: min(320px, calc(100vw - 72px)); max-height: 240px; overflow-y: auto; overscroll-behavior: contain; list-style: none; margin: 4px 0 0; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: #fff; box-shadow: 0 6px 20px #24364224; }
+.instrument-option { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; padding: 10px 12px; border-radius: 3px; font-size: 15px; line-height: 1.4; cursor: pointer; }
+.instrument-option[aria-selected="true"] { background: var(--selected); color: #07596d; }
+.instrument-option:hover { background: var(--surface); }
+.instrument-option > svg { stroke: var(--cyan-dark); }
 .instrument-stage { min-height: 360px; padding: 20px; display: flex; align-items: center; justify-content: center; background: #fff; }
 .control-column { grid-column: 2; grid-row: 1 / 3; min-width: 0; }
 .instrument-svg { display: block; width: 100%; max-width: 460px; max-height: 360px; overflow: visible; }

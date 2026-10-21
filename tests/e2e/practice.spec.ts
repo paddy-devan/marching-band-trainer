@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { readdirSync } from 'node:fs';
 import { practiceTime } from './practice-clock';
+import { chooseInstrument } from './instrument-picker';
 import { strToU8, zipSync } from 'fflate';
 
 const scoreCount = readdirSync('scores').filter(file => file.endsWith('.mscz')).length;
@@ -10,20 +11,83 @@ const scoreCount = readdirSync('scores').filter(file => file.endsWith('.mscz')).
 test('instrument selection releases pointer focus and retains keyboard focus', async ({ page }) => {
   await page.goto('./#colonel-bogey');
   const picker = page.getByRole('combobox', { name: 'Visualised instrument' });
-  for (const pointerType of ['mouse', 'touch']) {
-    await picker.focus();
-    await picker.dispatchEvent('pointerdown', { pointerType });
-    await picker.selectOption({ label: pointerType === 'mouse' ? 'Side Drum' : 'Bell Lyre' });
+  for (const name of ['Side Drum', 'Bell Lyre']) {
+    await chooseInstrument(page, name);
+    await expect(picker).toHaveText(name);
+    await expect(page.getByRole('listbox')).toHaveCount(0);
     await expect(picker).not.toBeFocused();
   }
   await picker.focus();
-  // Native type-ahead commits a keyboard choice without opening an OS popup.
+  // Browsing options leaves the current visual intact until confirmation.
   await picker.press('s');
-  await expect(picker.locator('option:checked')).toHaveText('Side Drum');
+  await expect(page.getByRole('option', { name: 'Side Drum' })).toHaveAttribute('aria-selected', 'true');
+  await expect(picker).toHaveText('Bell Lyre');
+  await picker.press('Enter');
+  await expect(picker).toHaveText('Side Drum');
   await expect(picker).toBeFocused();
   await expect(page.locator('.snare')).toBeVisible();
   await picker.press('Tab');
   await expect(picker).not.toBeFocused();
+});
+
+test('instrument keyboard navigation can cancel, confirm and dismiss without changing the audio mix', async ({ page }) => {
+  await page.goto('./#balaklava');
+  const picker = page.getByRole('combobox', { name: 'Visualised instrument' });
+  await picker.focus();
+  await picker.press('ArrowDown');
+  await expect(picker).toHaveAttribute('aria-expanded', 'true');
+  await expect(picker).toBeFocused();
+  await picker.press('End');
+  await expect(page.getByRole('option', { name: 'Cymbal' })).toHaveAttribute('aria-selected', 'true');
+  await picker.press('Escape');
+  await expect(picker).toHaveText('Bell Lyre');
+  await expect(page.locator('.lyre')).toBeVisible();
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+  await picker.press(' ');
+  await picker.press('ArrowDown');
+  await expect(page.getByRole('option', { name: 'Side Drum' })).toHaveAttribute('aria-selected', 'true');
+  await picker.press('Tab');
+  await expect(picker).toHaveText('Side Drum');
+  await expect(picker).not.toBeFocused();
+  await expect(page.locator('.snare')).toBeVisible();
+  await picker.focus();
+  await picker.press('Home');
+  await picker.press(' ');
+  await expect(picker).toHaveText('Bell Lyre');
+  await expect(picker).toBeFocused();
+  await picker.click();
+  await page.locator('.piece-heading h1').click();
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+  await expect(picker).toHaveText('Bell Lyre');
+  await page.locator('.part-controls summary').click();
+  await expect(page.getByRole('button', { name: /^Mute /, pressed: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Solo /, pressed: true })).toHaveCount(0);
+});
+
+test.describe('touch instrument selection', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test('a tap switches instruments and closes the in-page menu on narrow screens', async ({ page }) => {
+    await page.goto('./#colonel-bogey');
+    const picker = page.getByRole('combobox', { name: 'Visualised instrument' });
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const [name, graphic] of [['Side Drum', '.snare'], ['Bell Lyre', '.lyre']]) {
+        await picker.tap();
+        const option = page.getByRole('option', { name, exact: true });
+        await expect(option).toBeInViewport();
+        const box = (await page.getByRole('listbox').boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width);
+        await option.tap();
+        await expect(picker).toHaveText(name);
+        await expect(picker).not.toBeFocused();
+        await expect(page.locator(graphic)).toBeVisible();
+        await expect(page.getByRole('listbox')).toHaveCount(0);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+  });
 });
 
 test('single-part pieces have a static instrument heading with the same header height', async ({ page }) => {
@@ -81,10 +145,10 @@ test('desktop practice controls change real playback and keep following independ
   await expect(page.getByRole('slider', { name: 'Side Drum volume' })).toBeVisible();
   await page.getByRole('button', { name: 'Mute Side Drum' }).click();
   await expect(page.getByRole('button', { name: 'Mute Side Drum' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('combobox', { name: 'Visualised instrument' }).locator('option:checked')).toHaveText('Side Drum');
+  await expect(page.getByRole('combobox', { name: 'Visualised instrument' })).toHaveText('Side Drum');
   await page.getByRole('button', { name: 'Solo Bass Drum' }).click();
   await expect(page.getByRole('button', { name: 'Solo Bass Drum' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('combobox', { name: 'Visualised instrument' }).locator('option:checked')).toHaveText('Side Drum');
+  await expect(page.getByRole('combobox', { name: 'Visualised instrument' })).toHaveText('Side Drum');
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   const paused = await practiceTime(page);
   await page.waitForTimeout(150);
@@ -153,10 +217,10 @@ test('desktop practice controls change real playback and keep following independ
   await practiceTime(page, 29);
   await expect(page.locator('.bar-readout strong')).toHaveText('Bar 11 / 14');
   await page.getByRole('button', { name: 'Restart', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Visualised instrument' }).selectOption({ label: 'Side Drum' });
+  await chooseInstrument(page, 'Side Drum');
   await expect(page.locator('.bar-notes-row.current [aria-current="true"]')).toHaveText('R');
   await expect(page.locator('.practice-footer, .practice-tip, .catalogue-note, .register-note, .header-note')).toHaveCount(0);
-  await page.getByRole('combobox', { name: 'Visualised instrument' }).selectOption({ label: 'Bell Lyre' });
+  await chooseInstrument(page, 'Bell Lyre');
   await expect(page.getByRole('combobox', { name: 'Visualised instrument' })).toHaveCount(1);
   await expect(page.locator('.bar-letter').filter({ hasText: 'C♯6' })).toHaveCount(1);
   await expect(page.locator('.bar-notes')).not.toContainText('♭');
@@ -212,7 +276,7 @@ test('phone and tablet catalogue, instrument and primary controls fit and respon
   const visualBox = (await visual.boundingBox())!;
   expect(playbackBox.y + playbackBox.height).toBeLessThanOrEqual(visualBox.y);
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Visualised instrument' }).selectOption({ label: 'Side Drum' });
+  await chooseInstrument(page, 'Side Drum');
   await expect(page.locator('.snare')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: path.join(tmpdir(), 'marching-band-phone.png'), fullPage: true });
@@ -271,7 +335,7 @@ test('Web Audio produces a signal, immediately mutes it, and keeps the visual tr
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   const position = await practiceTime(page);
   await expect.poll(() => practiceTime(page)).toBeGreaterThan(position + 0.3);
-  await expect(page.getByRole('combobox', { name: 'Visualised instrument' }).locator('option:checked')).toHaveText('Side Drum');
+  await expect(page.getByRole('combobox', { name: 'Visualised instrument' })).toHaveText('Side Drum');
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect.poll(rms, { intervals: [30] }).toBeLessThan(0.000001);
 });
@@ -372,7 +436,7 @@ test('note bars keep the mixer stationary through sparse, dense, silent and fina
   }
   await expect(page.locator('.bar-notes-end')).toHaveText('End of score');
   await page.goto('./#balaklava');
-  await page.getByRole('combobox', { name: 'Visualised instrument' }).selectOption({ label: 'Cymbal' });
+  await chooseInstrument(page, 'Cymbal');
   await expect(page.locator('.current .bar-rest')).toHaveText('Rest');
   const silent = await geometry();
   await seek.fill('2');

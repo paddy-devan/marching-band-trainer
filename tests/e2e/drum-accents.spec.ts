@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { practiceTime } from './practice-clock';
+import { chooseInstrument } from './instrument-picker';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { Movement } from '../../src/score/model';
@@ -13,7 +14,7 @@ test('Balaklava dynamics change rendered stick heights, with relative accents an
   await expect(page).toHaveURL(/#balaklava$/);
   await expect(page.getByRole('heading', { name: 'Balaklava', exact: true })).toBeVisible();
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
-  await page.getByRole('combobox', { name: 'Visualised instrument' }).selectOption({ label: 'Side Drum' });
+  await chooseInstrument(page, 'Side Drum');
   const targets = await page.evaluate(async () => {
     const modulePath = '/src/score/loader.ts';
     const { loadCatalogue, loadScore } = await import(/* @vite-ignore */ modulePath);

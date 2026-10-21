@@ -88,7 +88,7 @@ Opening the bare URL shows a searchable home screen with no score selected. Piec
 
 Selecting a piece opens practice and updates the URL fragment to its encoded filename ID, for example `#colonel-bogey`. Browser Back/Forward restores selections, and the bare URL returns to the home screen. Invalid or unreadable links show an error while leaving other scores available. Desktop practice retains a searchable sidebar with the active score highlighted; mobile uses a **Change score** dialog.
 
-The practice page has a compact piece heading, instrument view and control column. The visual panel heading shows a static part name for single-part scores and an instrument dropdown for scores with multiple parts. The selected visual part is independent of the audio mix, so it is possible to follow a muted part. The controls provide:
+The practice page has a compact piece heading, instrument view and control column. The visual panel heading shows a static part name for single-part scores and an instrument dropdown for scores with multiple parts. The dropdown renders inside the page and applies choices without waiting for native menu dismissal. It supports pointer/touch selection, keyboard navigation and type-ahead, with Escape to cancel and Enter, Space or Tab to confirm. Pointer selection releases focus; keyboard selection retains it until navigation moves elsewhere. The selected visual part is independent of the audio mix, so it is possible to follow a muted part. The controls provide:
 
 - Play/pause, restart, a slider that seeks to bar starts, and the current/total written bar count. Slider steps follow the expanded performance, keeping repeat passes separately reachable and respecting pickups and tempo changes. Beat numbers and timestamps are omitted.
 - Tempo from 50–125%, presets of 50%, 60%, 80%, 90% and 100%, and the effective crotchet BPM. Speed changes timing without changing pitch.
@@ -100,7 +100,7 @@ Current and next played bars appear below the instrument as compact rhythm strip
 
 Lyre beaters and drum sticks follow playback, pause with the transport and reproduce the same pose after seeking. Stick preparation reflects dynamics and accents; each hand recovers towards its next stroke, while rolls and flam grace strokes remain close to the head. The animation is deterministic and separate from audio scheduling and challenge judgement.
 
-Controls support native keyboard interaction and touch targets. Mobile playback fits Play/Pause, Restart, bar slider and bar count into one row with 44-pixel-high interactive targets. Play/Pause uses an accessible icon button on phones. The row scrolls with the page so it does not obscure the instrument. Reduced motion retains highlights and labels, disables stick movement and animated beater travel, and leaves a stationary lyre cue above the next note.
+Controls support standard keyboard interaction and touch targets. Mobile playback fits Play/Pause, Restart, bar slider and bar count into one row with 44-pixel-high interactive targets. Play/Pause uses an accessible icon button on phones. The row scrolls with the page so it does not obscure the instrument. Reduced motion retains highlights and labels, disables stick movement and animated beater travel, and leaves a stationary lyre cue above the next note.
 
 ## Audio and timing
 
