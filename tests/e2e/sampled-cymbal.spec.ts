@@ -1,11 +1,15 @@
 import { expect, test } from '@playwright/test';
 import { practiceTime } from './practice-clock';
 
-test('a soloed sampled cymbal sounds in practice and its ringing tail obeys mute and pause', async ({ page }) => {
+test('a soloed sampled cymbal sounds in practice and its ringing tail obeys mute and pause', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 360, height: 780 });
   const errors: string[] = [];
   const sampleRequests: string[] = [];
-  page.on('request', request => { if (request.url().endsWith('.m4a')) sampleRequests.push(request.url()); });
+  page.on('request', request => {
+    if (/\/marching-hand-cymbal[^/?]*\.(wav|m4a)$/.test(request.url())) sampleRequests.push(request.url());
+  });
   page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (['error', 'warning'].includes(message.type())) errors.push(message.text()); });
   await page.addInitScript(() => {
     const original = AudioContext.prototype.createGain;
     let attached = false;
@@ -27,6 +31,10 @@ test('a soloed sampled cymbal sounds in practice and its ringing tail obeys mute
     };
   });
   await page.goto('./#heart-of-oak');
+  await expect(page).toHaveTitle('SLSCC Band');
+  await expect(page).toHaveURL(/#heart-of-oak$/);
+  await expect(page.locator('.practice .piece-heading h1')).toHaveText('Heart of Oak');
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   await page.locator('.part-controls summary').click();
   await expect(page.getByRole('button', { name: 'Solo Cymbal', exact: true })).toBeVisible();
   const firstCrash = await page.evaluate(async () => {
@@ -42,6 +50,8 @@ test('a soloed sampled cymbal sounds in practice and its ringing tail obeys mute
   await practiceTime(page, Math.max(0, firstCrash - 0.1));
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect.poll(rms, { intervals: [20] }).toBeGreaterThan(0.001);
+  await page.screenshot({ path: '/tmp/heart-of-oak-cymbal-phone.png' });
+  await testInfo.attach('phone-cymbal-playback', { path: '/tmp/heart-of-oak-cymbal-phone.png', contentType: 'image/png' });
   await page.getByRole('button', { name: 'Mute Cymbal', exact: true }).click();
   await expect.poll(rms, { intervals: [20] }).toBeLessThan(0.000001);
   await page.getByRole('button', { name: 'Mute Cymbal', exact: true }).click();
@@ -50,10 +60,10 @@ test('a soloed sampled cymbal sounds in practice and its ringing tail obeys mute
   await expect.poll(rms, { intervals: [20] }).toBeLessThan(0.000001);
   expect(errors).toEqual([]);
   expect(sampleRequests).toHaveLength(1);
-  expect(sampleRequests[0]).toContain('marching-hand-cymbal');
+  expect(sampleRequests[0]).toMatch(/marching-hand-cymbal\.wav$/);
 });
 
-test('the main crash lands on the beat, retains its tail, scales velocity, and overlaps without clipping', async ({ page }) => {
+test('the main crash lands on the beat, retains its tail, scales velocity, and overlaps without clipping', async ({ page }, testInfo) => {
   await page.goto('./#heart-of-oak');
   const renders = await page.evaluate(async () => {
     const modulePath = '/src/audio/cymbal.ts';
@@ -78,7 +88,7 @@ test('the main crash lands on the beat, retains its tail, scales velocity, and o
         const data = left.subarray(Math.round(from * rate), Math.round(to * rate));
         return Math.sqrt(data.reduce((sum, value) => sum + value * value, 0) / data.length);
       };
-      results.push({ duration: recording.duration, channels: recording.numberOfChannels,
+      results.push({ duration: recording.duration, sampleRate: recording.sampleRate, channels: recording.numberOfChannels,
         onsetDelay: onset - 0.05, beforeBeat: rms(0, 0.05),
         sharedBuffer: sources.every(source => source.buffer === recording && source.playbackRate.value === 1 && !source.loop),
         finite: left.every(Number.isFinite) && right.every(Number.isFinite),
@@ -89,8 +99,10 @@ test('the main crash lands on the beat, retains its tail, scales velocity, and o
     }
     return results;
   });
+  await testInfo.attach('cymbal-onset-measurements', { body: JSON.stringify(renders, null, 2), contentType: 'application/json' });
   for (const render of renders) {
-    expect(render.duration).toBeCloseTo(11.015, 1);
+    // The duration is the PCM content, with no leading or trailing codec frames.
+    expect(Math.abs(render.duration - 485777 / 44100)).toBeLessThan(1 / render.sampleRate);
     expect(render.channels).toBe(2);
     expect(render.beforeBeat).toBe(0);
     expect(render.onsetDelay).toBeGreaterThanOrEqual(0);

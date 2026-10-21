@@ -1,4 +1,6 @@
-import sampleUrl from '../../samples/marching-hand-cymbal.m4a?url';
+// PCM has no codec priming for browsers to trim differently. The original AAC
+// recording contains 2,112 priming frames (~48 ms), separate from this lead-in.
+import sampleUrl from '../../samples/marching-hand-cymbal.wav?url';
 
 // The recording has quiet contact noise before the main crash at roughly 30 ms.
 const CRASH_OFFSET_SECONDS = 0.03;
