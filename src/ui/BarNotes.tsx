@@ -70,7 +70,7 @@ export function barRhythm(score: Score, part: Part, movements: Movement[], bar: 
 }
 
 function labelSize(cue: RhythmCue) {
-  const width = Math.max(1, ...cue.labels.map(label => /^[A-G]/.test(label) ? (label.includes('♯') ? 29 : 21) : label === 'Strike' ? 44 : / (Roll|Flam)$/.test(label) ? 19 : 16));
+  const width = Math.max(1, ...cue.labels.map(label => /^[A-G]/.test(label) ? (/[♯♭]/.test(label) ? 26 : 21) : label === 'Strike' ? 44 : / (Roll|Flam)$/.test(label) ? 19 : 16));
   const height = 22 * cue.labels.length + (cue.held || cue.labels.some(label => / (Roll|Flam)$/.test(label)) ? 8 : 0);
   return { width, height };
 }
@@ -135,9 +135,9 @@ function RhythmRow({ rhythm, bar, queued = false, progress, position, lit }: Row
             <svg viewBox={`0 0 ${labelWidth} ${labelHeight}`} aria-hidden="true">
               <rect className="note-highlight" x="0" y="0" width={labelWidth} height={labelHeight} rx="3" />
               {cue.labels.map((label, row) => {
-            const pitch = label.match(/^([A-G][♯♭]?)(-?\d+)$/);
+            const pitch = label.match(/^([A-G])([♯♭]?)(-?\d+)$/);
             const technique = label.match(/^(.+) (Roll|Flam)$/);
-            return <text key={label} x={labelWidth / 2} y={16 + row * 22} textAnchor="middle">{pitch ? <>{pitch[1]}<tspan className="note-octave" dy="3">{pitch[2]}</tspan></> : technique ? <>{technique[1]}<tspan x={labelWidth / 2} dy="10" className="note-technique"> {technique[2]}</tspan></> : label}</text>;
+            return <text key={label} x={labelWidth / 2} y={16 + row * 22} textAnchor="middle">{pitch ? <>{pitch[1]}{pitch[2] ? <tspan className="note-accidental" dy="-4">{pitch[2]}</tspan> : null}<tspan className="note-octave" dy={pitch[2] ? 7 : 3}>{pitch[3]}</tspan></> : technique ? <>{technique[1]}<tspan x={labelWidth / 2} dy="10" className="note-technique"> {technique[2]}</tspan></> : label}</text>;
           })}{cue.held ? <text x={labelWidth / 2} y={labelHeight - 2} textAnchor="middle" className="note-hold">Hold</text> : null}
             </svg>
             </span>;
