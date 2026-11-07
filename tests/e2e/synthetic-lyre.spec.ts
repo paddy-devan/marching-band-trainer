@@ -12,7 +12,7 @@ test('lyre renders a warm metallic attack, a pitched decay and clean overlapping
         const output = context.createGain(); output.gain.value = 0.2; output.connect(context.destination);
         const synth = new LyreSynth(context, () => {});
         synth.strike(0.05, pitch, 0.8, output);
-        // Several overlapping strikes exercise headroom at the current master gain.
+        // Several overlapping strikes exercise headroom in this isolated voice render.
         for (const offset of [0, 4, 7, 12]) synth.strike(2.5, pitch + offset, 1, output, 0.1);
         const data = (await context.startRendering()).getChannelData(0);
         const rms = (from: number, to: number) => {
