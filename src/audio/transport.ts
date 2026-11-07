@@ -4,6 +4,7 @@ import { countIn, metronomeClicks, type Click } from './beats';
 import { SnareSynth } from './snare';
 import { CymbalSample } from './cymbal';
 import { LyreSynth } from './lyre';
+import { createMasterOutput } from './output';
 
 export type Mix = Record<string, { muted: boolean; solo: boolean; volume?: number }>;
 export type TransportState = { playing: boolean; position: number; speed: number; metronome: boolean; status?: string };
@@ -88,10 +89,8 @@ export class Transport {
     if (this.context) return;
     const context = this.createContext();
     this.context = context;
-    const master = context.createGain();
+    const master = createMasterOutput(context);
     this.master = master;
-    master.gain.value = 0.2;
-    master.connect(context.destination);
     for (const p of this.parts.values()) {
       const bus = context.createGain();
       bus.connect(master);

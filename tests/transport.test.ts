@@ -26,6 +26,7 @@ class FakeContext {
   decodeAudioData = vi.fn(async (_data: ArrayBuffer) => this.createBuffer(2, this.sampleRate * 11, this.sampleRate));
   addEventListener(_type: string, callback: () => void) { this.callbacks.push(callback); }
   createGain() { const node = new FakeGain(); this.gains.push(node); return node; }
+  createWaveShaper() { return new FakeNode(); }
   createOscillator() { const node = new FakeSource(); this.sources.push(node); return node; }
   createBufferSource() { return this.createOscillator(); }
   createConvolver() { const node = new FakeNode(); this.convolvers.push(node); return node; }
@@ -50,6 +51,24 @@ describe('audio-clock transport', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }));
   });
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+  it('uses amplified output while preserving individual part levels across playback restarts', async () => {
+    const { score, context, transport } = setup();
+    await transport.play({ metronome: true });
+    expect(context.gains[0].gain.value).toBe(2);
+    const scheduled = context.sources.length;
+    const position = transport.getSnapshot().position;
+    transport.setMix({ [score.parts[0].id]: { muted: false, solo: false, volume: 0.35 } });
+    expect(context.gains[0].gain.value).toBe(2);
+    expect(context.gains[1].gain.value).toBe(0.35);
+    expect(transport.getSnapshot()).toMatchObject({ playing: true, position, metronome: true });
+    expect(context.sources).toHaveLength(scheduled);
+    expect(context.sources.every(source => !source.stop.mock.calls.some(args => args.length === 0))).toBe(true);
+    transport.pause();
+    transport.restart();
+    await transport.play();
+    expect(context.gains[0].gain.value).toBe(2);
+    transport.dispose();
+  });
   it.each([
     ['Side Drum', 'snare-drum', 'pp', 33], ['Side Drum', 'snare-drum', 'mf', 80], ['Side Drum', 'snare-drum', 'fff', 126],
     ['Bass Drum', 'bass-drum', 'pp', 33], ['Bass Drum', 'bass-drum', 'mf', 80], ['Bass Drum', 'bass-drum', 'fff', 126],
