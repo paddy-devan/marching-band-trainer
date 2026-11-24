@@ -31,6 +31,7 @@ export function Practice({ timeline, onChallenge, settings, setSettings, drumTim
     const transport = new Transport(timeline);
     transport.setSpeed(settings.speed);
     transport.setMetronome(settings.metronome);
+    transport.setMetronomeVolume(settings.metronomeVolume);
     transport.setMix(mix);
     return transport;
   });
@@ -53,13 +54,18 @@ export function Practice({ timeline, onChallenge, settings, setSettings, drumTim
     transport.setMetronome(metronome);
     setSettings(current => ({ ...current, metronome }));
   };
+  const changeMetronomeVolume = (metronomeVolume: number) => {
+    transport.setMetronomeVolume(metronomeVolume);
+    setSettings(current => ({ ...current, metronomeVolume }));
+  };
   const changePartMix = (id: string, next: Mix[string]) => {
     transport.setMix({ ...mix, [id]: next });
     setSettings(current => ({ ...current, mix: { ...current.mix, [partKeys.get(id)!]: next } }));
   };
   const resetSettings = () => {
-    const { speed, metronome, mix } = DEFAULT_PRACTICE_SETTINGS;
+    const { speed, metronome, metronomeVolume, mix } = DEFAULT_PRACTICE_SETTINGS;
     transport.setMix(mix);
+    transport.setMetronomeVolume(metronomeVolume);
     if (state.speed !== speed) transport.setSpeed(speed);
     transport.setMetronome(metronome);
     setSettings(current => ({ ...DEFAULT_PRACTICE_SETTINGS, partKey: current.partKey }));
@@ -85,7 +91,8 @@ export function Practice({ timeline, onChallenge, settings, setSettings, drumTim
       <div className="control-column">
         <TransportControls transport={transport} state={state} timeline={timeline} measure={measure} bpm={tempo.bpm}
           onSpeed={changeSpeed} onMetronome={changeMetronome} onReset={resetSettings}>
-          <PartControls parts={score.parts} mix={mix} onPartMix={changePartMix} />
+          <PartControls parts={score.parts} mix={mix} onPartMix={changePartMix}
+            metronomeEnabled={state.metronome} metronomeVolume={settings.metronomeVolume} onMetronomeVolume={changeMetronomeVolume} />
         </TransportControls>
         {hasLyre || hasDrum ? <section className="challenge-launcher" aria-labelledby="challenges-title">
           <h2 id="challenges-title">Challenges</h2>

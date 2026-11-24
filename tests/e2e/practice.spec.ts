@@ -106,11 +106,14 @@ test('single-part pieces have a static instrument heading with the same header h
 });
 
 test('practice settings survive a score change and reload, and reset across the repertoire', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('band-trainer:practice-settings:v1', '{"speed":0.9,"metronomeVolume":0.8}'));
   await page.goto('./#balaklava');
   const settings = page.getByRole('region', { name: 'Practice settings' });
   const playback = page.getByRole('region', { name: 'Playback controls' });
   const picker = page.getByRole('combobox', { name: 'Visualised instrument' });
   const metronome = settings.getByRole('switch', { name: 'Metronome' });
+  const metronomeVolume = page.getByRole('slider', { name: 'Metronome volume' });
+  const metronomeRow = settings.locator('.part-row').filter({ has: metronomeVolume });
   const tempo = settings.getByRole('slider', { name: 'Tempo' });
   const seek = playback.getByRole('slider', { name: 'Playback position' });
   const mixer = settings.locator('.mixer-heading');
@@ -119,10 +122,21 @@ test('practice settings survive a score change and reload, and reset across the 
   const solo = settings.getByRole('button', { name: 'Solo Cymbal' });
 
   await expect(metronome).toBeChecked();
+  await expect(tempo).toHaveValue('90');
   await chooseInstrument(page, 'Cymbal');
   await settings.getByRole('button', { name: '80%' }).click();
-  await metronome.uncheck();
   await mixer.click();
+  await expect(metronomeVolume).toHaveValue('100');
+  await metronomeVolume.fill('65');
+  await metronome.uncheck();
+  await expect(metronomeVolume).toBeVisible();
+  await expect(metronomeVolume).toBeDisabled();
+  await expect(metronomeRow.locator('.part-volume')).toHaveCSS('opacity', '0.5');
+  await expect(metronomeRow.getByText('Metronome', { exact: true })).toHaveCSS('color', 'rgb(140, 152, 159)');
+  await metronome.check();
+  await expect(metronomeVolume).toBeEnabled();
+  await expect(metronomeVolume).toHaveValue('65');
+  await metronome.uncheck();
   await volume.fill('37');
   await mute.click();
   await solo.click();
@@ -135,6 +149,8 @@ test('practice settings survive a score change and reload, and reset across the 
   await expect(picker).toHaveText('Cymbal');
   await expect(tempo).toHaveValue('80');
   await expect(metronome).not.toBeChecked();
+  await expect(metronomeVolume).toHaveValue('65');
+  await expect(metronomeVolume).toBeDisabled();
   await expect(volume).toHaveValue('37');
   await expect(mute).toHaveAttribute('aria-pressed', 'true');
   await expect(solo).toHaveAttribute('aria-pressed', 'true');
@@ -143,6 +159,7 @@ test('practice settings survive a score change and reload, and reset across the 
   await expect(picker).toHaveText('Cymbal');
   await expect(tempo).toHaveValue('80');
   await expect(metronome).not.toBeChecked();
+  await expect(metronomeVolume).toHaveValue('65');
   await expect(volume).toHaveValue('37');
 
   await page.getByRole('button', { name: /Colonel Bogey/ }).click();
@@ -163,6 +180,7 @@ test('practice settings survive a score change and reload, and reset across the 
   await page.getByRole('button', { name: /Balaklava/ }).click();
   await expect(volume).toBeHidden();
   await mixer.click();
+  await expect(metronomeVolume).toHaveValue('100');
   await expect(volume).toHaveValue('100');
   await expect(mute).toHaveAttribute('aria-pressed', 'false');
   await expect(solo).toHaveAttribute('aria-pressed', 'false');
@@ -200,6 +218,19 @@ test('the mixer stays open for adjusted parts and starts closed for a default mi
   await page.getByRole('button', { name: /The Captain General/ }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('The Captain General');
   await expect(mixer).not.toHaveAttribute('open');
+  await heading.click();
+  const metronomeVolume = page.getByRole('slider', { name: 'Metronome volume' });
+  await metronomeVolume.fill('95');
+  await expect(heading).toHaveAttribute('aria-disabled', 'true');
+  await page.getByRole('button', { name: /Colonel Bogey/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Colonel Bogey');
+  await expect(metronomeVolume).toHaveValue('95');
+  await metronomeVolume.press('End');
+  await expect(metronomeVolume).toHaveValue('100');
+  await expect(heading).not.toHaveAttribute('aria-disabled', 'true');
+  await page.getByRole('button', { name: /Balaklava/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Balaklava');
+  await expect(mixer).not.toHaveAttribute('open');
 });
 
 test('the shared footer links to Sea Cadets and Debug shows current persistent settings', async ({ page }) => {
@@ -216,7 +247,7 @@ test('the shared footer links to Sea Cadets and Debug shows current persistent s
   await debug.click();
   await expect(panel).toBeVisible();
   expect(JSON.parse(await values.innerText())).toMatchObject({
-    practiceSettings: { speed: 1, metronome: true, partKey: null, mix: {} },
+    practiceSettings: { speed: 1, metronome: true, metronomeVolume: 1, partKey: null, mix: {} },
     drumTimingMs: { visualOffset: 35, downstroke: 65 },
   });
   await page.keyboard.press('Escape');

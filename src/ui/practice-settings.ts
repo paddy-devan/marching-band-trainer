@@ -4,17 +4,22 @@ import type { Part } from '../score/model';
 export type PracticeSettings = {
   speed: number;
   metronome: boolean;
+  metronomeVolume: number;
   partKey?: string;
   mix: Mix;
 };
 
-const STORAGE_KEY = 'band-trainer:practice-settings:v1';
-export const DEFAULT_PRACTICE_SETTINGS: PracticeSettings = { speed: 1, metronome: true, mix: {} };
+const STORAGE_KEY = 'band-trainer:practice-settings:v2';
+const LEGACY_STORAGE_KEY = 'band-trainer:practice-settings:v1';
+export const DEFAULT_PRACTICE_SETTINGS: PracticeSettings = { speed: 1, metronome: true, metronomeVolume: 1, mix: {} };
 
 export function loadPracticeSettings(): PracticeSettings {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as Partial<PracticeSettings> | null;
+    const current = localStorage.getItem(STORAGE_KEY);
+    const saved = JSON.parse(current ?? localStorage.getItem(LEGACY_STORAGE_KEY) ?? 'null') as Partial<PracticeSettings> | null;
     const speed = saved?.speed;
+    // Version 1 saved the 80% default even when the user left it alone.
+    const metronomeVolume = current === null && saved?.metronomeVolume === 0.8 ? undefined : saved?.metronomeVolume;
     const mix = Object.fromEntries(Object.entries(saved?.mix ?? {}).flatMap(([key, part]) => {
       if (!part || typeof part !== 'object') return [];
       const volume = part.volume;
@@ -27,6 +32,8 @@ export function loadPracticeSettings(): PracticeSettings {
     return {
       speed: typeof speed === 'number' && speed >= 0.5 && speed <= 1.25 ? speed : DEFAULT_PRACTICE_SETTINGS.speed,
       metronome: typeof saved?.metronome === 'boolean' ? saved.metronome : DEFAULT_PRACTICE_SETTINGS.metronome,
+      metronomeVolume: typeof metronomeVolume === 'number' && metronomeVolume >= 0 && metronomeVolume <= 1
+        ? metronomeVolume : DEFAULT_PRACTICE_SETTINGS.metronomeVolume,
       partKey: typeof saved?.partKey === 'string' ? saved.partKey : undefined,
       mix,
     };

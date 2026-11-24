@@ -199,8 +199,9 @@ describe('audio-clock transport', () => {
     expect(transport.getSnapshot().position).toBe(0);
     transport.dispose();
   });
-  it('toggles live metronome clicks without cancelling instrument notes or shifting the clock', async () => {
+  it('adjusts live metronome clicks without cancelling instrument notes or shifting the clock', async () => {
     const { context, transport } = setup();
+    transport.setMetronomeVolume(0.8);
     await transport.play();
     const instruments = [...context.sources];
     context.currentTime = 0.435;
@@ -209,6 +210,13 @@ describe('audio-clock transport', () => {
     const click = context.sources.at(-1)!;
     expect(click.frequency.calls[0].value).toBe(1000);
     expect(click.start).toHaveBeenCalledWith(0.535);
+    const envelope = click.connect.mock.calls[0][0] as FakeGain;
+    const bus = envelope.connect.mock.calls[0][0] as FakeGain;
+    expect(bus.connect).toHaveBeenCalledWith(context.gains[0]);
+    expect(bus.gain.value).toBeCloseTo(1.6);
+    transport.setMetronomeVolume(0);
+    expect(bus.gain.calls.at(-1)).toEqual({ value: 0, time: 0.435 });
+    expect(click.stop).not.toHaveBeenCalledWith();
     expect(transport.getSnapshot().position).toBeCloseTo(0.4);
     transport.setMetronome(false);
     expect(click.stop).toHaveBeenCalledWith();

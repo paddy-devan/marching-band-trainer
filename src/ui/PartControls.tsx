@@ -2,11 +2,35 @@ import { useState } from 'react';
 import type { Mix } from '../audio/transport';
 import type { Part } from '../score/model';
 import { Slider } from './Slider';
+import { DEFAULT_PRACTICE_SETTINGS } from './practice-settings';
 
 const DEFAULT_PART_MIX = { muted: false, solo: false };
-type Props = { parts: Part[]; mix: Mix; onPartMix: (id: string, settings: Mix[string]) => void };
-export function PartControls({ parts, mix, onPartMix }: Props) {
-  const hasAdjustments = parts.some(({ id }) => {
+type Props = {
+  parts: Part[];
+  mix: Mix;
+  onPartMix: (id: string, settings: Mix[string]) => void;
+  metronomeEnabled: boolean;
+  metronomeVolume: number;
+  onMetronomeVolume: (volume: number) => void;
+};
+
+function MixerVolume({ id, name, volume, disabled, onChange }: {
+  id: string;
+  name: string;
+  volume: number;
+  disabled?: boolean;
+  onChange: (volume: number) => void;
+}) {
+  const percent = Math.round(volume * 100);
+  return <div className="part-volume">
+    <Slider id={id} min={0} max={100} step="1" aria-label={`${name} volume`} aria-valuetext={`${percent} percent`}
+      value={percent} disabled={disabled} onChange={e => onChange(Number(e.target.value) / 100)} />
+    <output htmlFor={id}>{percent}%</output>
+  </div>;
+}
+
+export function PartControls({ parts, mix, onPartMix, metronomeEnabled, metronomeVolume, onMetronomeVolume }: Props) {
+  const hasAdjustments = metronomeVolume !== DEFAULT_PRACTICE_SETTINGS.metronomeVolume || parts.some(({ id }) => {
     const settings = mix[id];
     return settings && (settings.muted || settings.solo || (settings.volume ?? 1) !== 1);
   });
@@ -23,15 +47,18 @@ export function PartControls({ parts, mix, onPartMix }: Props) {
     <div className="part-table">
       {parts.map(part => <div className="part-row" key={part.id} data-muted={!!mix[part.id]?.muted}>
         <strong>{part.name}</strong>
-        <div className="part-volume">
-          <Slider id={`volume-${part.id}`} min={0} max={100} step="1" aria-label={`${part.name} volume`} aria-valuetext={`${Math.round((mix[part.id]?.volume ?? 1) * 100)} percent`} value={Math.round((mix[part.id]?.volume ?? 1) * 100)} onChange={e => onPartMix(part.id, { ...(mix[part.id] ?? DEFAULT_PART_MIX), volume: Number(e.target.value) / 100 })} />
-          <output htmlFor={`volume-${part.id}`}>{Math.round((mix[part.id]?.volume ?? 1) * 100)}%</output>
-        </div>
+        <MixerVolume id={`volume-${part.id}`} name={part.name} volume={mix[part.id]?.volume ?? 1}
+          onChange={volume => onPartMix(part.id, { ...(mix[part.id] ?? DEFAULT_PART_MIX), volume })} />
         <div className="part-actions">
           <button aria-label={`Mute ${part.name}`} title={`Mute ${part.name}`} aria-pressed={!!mix[part.id]?.muted} className={`mix-button ${mix[part.id]?.muted ? 'is-muted' : ''}`} onClick={() => toggle(part.id, 'muted')}>M</button>
           <button aria-label={`Solo ${part.name}`} title={`Solo ${part.name}`} aria-pressed={!!mix[part.id]?.solo} className="mix-button" onClick={() => toggle(part.id, 'solo')}>S</button>
         </div>
       </div>)}
+      <div className="part-row" data-disabled={!metronomeEnabled}>
+        <strong>Metronome</strong>
+        <MixerVolume id="volume-metronome" name="Metronome" volume={metronomeVolume}
+          disabled={!metronomeEnabled} onChange={onMetronomeVolume} />
+      </div>
     </div>
     </details>
   </section>;
