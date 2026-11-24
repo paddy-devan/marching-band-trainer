@@ -4,13 +4,25 @@ import { useMemo, type ReactNode } from 'react';
 import { secondsAt } from '../score/interpret';
 import { Slider } from './Slider';
 
-export function TransportControls({ transport, state, timeline, measure, bpm, children }: { transport: Transport; state: TransportState; timeline: Timeline; measure: Measure; bpm: number; children: ReactNode }) {
+type Props = {
+  transport: Transport;
+  state: TransportState;
+  timeline: Timeline;
+  measure: Measure;
+  bpm: number;
+  onSpeed: (speed: number) => void;
+  onMetronome: (enabled: boolean) => void;
+  onReset: () => void;
+  children: ReactNode;
+};
+
+export function TransportControls({ transport, state, timeline, measure, bpm, onSpeed, onMetronome, onReset, children }: Props) {
   const barStarts = useMemo(() => timeline.score.measures.map(m => secondsAt(timeline.score, m.start)), [timeline]);
   const bar = (measure.sourceIndex ?? measure.index) + 1;
   const writtenBars = timeline.score.writtenMeasureCount || barStarts.length;
   const barLabel = `Bar ${bar} of ${writtenBars}${barStarts.length !== writtenBars ? `, played bar ${measure.index + 1} of ${barStarts.length}` : ''}`;
-  return <section className="transport-controls" aria-label="Playback controls">
-    <div className="playback-controls">
+  return <div className="transport-controls">
+    <section className="playback-controls" aria-label="Playback controls">
     <div className="playback-row">
       <div className="transport-actions"><button className="play-button" aria-label={state.playing ? 'Pause' : 'Play'} onClick={() => state.playing ? transport.pause() : void transport.play()}>
         <svg viewBox="0 0 24 24" aria-hidden="true">{state.playing ? <path d="M7 5h4v14H7zM15 5h4v14h-4z" /> : <path d="m7 4 14 8-14 8z" />}</svg><span>{state.playing ? 'Pause' : 'Play'}</span></button>
@@ -22,18 +34,24 @@ export function TransportControls({ transport, state, timeline, measure, bpm, ch
       <div className="bar-readout"><strong>Bar {bar}<span> / {writtenBars}</span></strong></div>
     </div>
     {state.status ? <p className="error" role="status">{state.status}</p> : null}
-    </div>
-    <div className="practice-settings">
-    <div className="tempo-controls">
-      <div className="speed-heading"><label htmlFor="speed">Tempo</label><output htmlFor="speed"><span>{Math.round(bpm * state.speed)} BPM</span><span>{Math.round(state.speed * 100)}%</span></output></div>
-      <Slider id="speed" min={50} max={125} step="5" value={Math.round(state.speed * 100)} aria-valuetext={`${Math.round(bpm * state.speed)} BPM, ${Math.round(state.speed * 100)} percent`} onChange={e => transport.setSpeed(Number(e.target.value) / 100)} />
-      <div className="speed-presets">{[0.5, 0.6, 0.8, 0.9, 1].map(speed => <button key={speed} aria-pressed={state.speed === speed} onClick={() => transport.setSpeed(speed)}>{Math.round(speed * 100)}%</button>)}</div>
-    </div>
-    <label className="metronome-control">
-      <span>Metronome</span>
-      <input type="checkbox" role="switch" aria-label="Metronome" checked={state.metronome} onChange={e => transport.setMetronome(e.target.checked)} />
-    </label>
-    {children}
-    </div>
-  </section>;
+    </section>
+    <section className="practice-settings" aria-labelledby="practice-settings-title">
+      <header className="practice-settings-heading">
+        <h2 id="practice-settings-title">Practice settings</h2>
+        <button type="button" className="reset-settings-button" onClick={onReset}>Reset</button>
+      </header>
+      <div className="practice-settings-panel">
+        <div className="tempo-controls">
+          <div className="speed-heading"><label htmlFor="speed">Tempo</label><output htmlFor="speed"><span>{Math.round(bpm * state.speed)} BPM</span><span>{Math.round(state.speed * 100)}%</span></output></div>
+          <Slider id="speed" min={50} max={125} step="5" value={Math.round(state.speed * 100)} aria-valuetext={`${Math.round(bpm * state.speed)} BPM, ${Math.round(state.speed * 100)} percent`} onChange={e => onSpeed(Number(e.target.value) / 100)} />
+          <div className="speed-presets">{[0.5, 0.6, 0.8, 0.9, 1].map(speed => <button key={speed} aria-pressed={state.speed === speed} onClick={() => onSpeed(speed)}>{Math.round(speed * 100)}%</button>)}</div>
+        </div>
+        <label className="metronome-control">
+          <span>Metronome</span>
+          <input type="checkbox" role="switch" aria-label="Metronome" checked={state.metronome} onChange={e => onMetronome(e.target.checked)} />
+        </label>
+        {children}
+      </div>
+    </section>
+  </div>;
 }

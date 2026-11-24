@@ -17,6 +17,7 @@ type SoundSource = AudioScheduledSourceNode;
 const MAX_OUTPUT_DELAY = 2;
 // Apply after score velocity clamping so accents remain distinct at louder dynamics.
 const DRUM_ACCENT_GAIN = 1.6;
+const MAX_METRONOME_GAIN = 2;
 function deviceLatency(delay: number | undefined) {
   return typeof delay === 'number' && Number.isFinite(delay) && delay >= 0 && delay <= MAX_OUTPUT_DELAY ? delay : 0;
 }
@@ -25,6 +26,8 @@ export class Transport {
   private context?: AudioContext;
   private master?: GainNode;
   private buses = new Map<string, GainNode>();
+  private metronomeBus?: GainNode;
+  private metronomeGain = 1;
   private sources = new Set<SoundSource>();
   private metronomeSources = new Set<SoundSource>();
   private listeners = new Set<() => void>();
@@ -96,6 +99,9 @@ export class Transport {
       bus.connect(master);
       this.buses.set(p.id, bus);
     }
+    this.metronomeBus = context.createGain();
+    this.metronomeBus.gain.value = this.metronomeGain;
+    this.metronomeBus.connect(master);
     context.addEventListener('statechange', () => {
       if (this.state.playing && context.state !== 'running') {
         this.pause();
@@ -162,6 +168,11 @@ export class Transport {
     if (this.state.playing) this.reanchor(position);
   }
   setMix(mix: Mix) { this.mix = mix; this.updateGains(); }
+  setMetronomeVolume(volume: number) {
+    if (!Number.isFinite(volume)) return;
+    this.metronomeGain = Math.max(0, Math.min(1, volume)) * MAX_METRONOME_GAIN;
+    if (this.metronomeBus && this.context) this.metronomeBus.gain.setValueAtTime(this.metronomeGain, this.context.currentTime);
+  }
   setMetronome(enabled: boolean) {
     if (enabled === this.state.metronome) return;
     // Cancel only click voices: switching the click never interrupts a held
@@ -229,7 +240,8 @@ export class Transport {
       if (click.time >= 0 && !this.state.metronome) continue;
       const when = this.anchorTime + (click.time - this.anchorPosition) / this.state.speed;
       if (when >= this.context.currentTime - 0.01) {
-        const source = this.tone(click.accent ? 1400 : 1000, Math.max(when, this.context.currentTime), 0.045, 0.3);
+        const output = click.time < 0 ? this.master : this.metronomeBus;
+        const source = this.tone(click.accent ? 1400 : 1000, Math.max(when, this.context.currentTime), 0.045, 0.3, output);
         if (click.time >= 0) this.metronomeSources.add(source);
       }
     }
@@ -241,10 +253,10 @@ export class Transport {
     }
     this.notify({ position: this.outputTiming ? this.readPosition() : position });
   }
-  private tone(frequency: number, when: number, duration: number, volume: number) {
+  private tone(frequency: number, when: number, duration: number, volume: number, output = this.master!) {
     const ctx = this.context!;
     const gain = ctx.createGain();
-    gain.connect(this.master!);
+    gain.connect(output);
     gain.gain.setValueAtTime(0.0001, when);
     gain.gain.linearRampToValueAtTime(volume, when + 0.006);
     gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);

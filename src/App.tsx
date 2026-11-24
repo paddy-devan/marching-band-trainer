@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { loadCatalogue, loadScore } from './score/loader';
 import { Catalogue, type CatalogueItem } from './ui/Catalogue';
 import { Practice } from './ui/Practice';
 import { Challenge } from './ui/Challenge';
+import { AppFooter } from './ui/AppFooter';
+import { loadDrumTiming } from './ui/drum-timing';
+import { loadPracticeSettings, savePracticeSettings } from './ui/practice-settings';
 import type { ChallengeMode } from './game/parts';
 
 function challengeFromHash(): ChallengeMode | undefined {
@@ -22,8 +25,10 @@ export default function App() {
   const [linkedScore, setLinkedScore] = useState(scoreIdFromHash);
   const [game, setGame] = useState(challengeFromHash);
   const [query, setQuery] = useState('');
+  const [practiceSettings, setPracticeSettings] = useState(loadPracticeSettings);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
+  useEffect(() => savePracticeSettings(practiceSettings), [practiceSettings]);
   useEffect(() => {
     const syncSelection = () => { setLinkedScore(scoreIdFromHash()); setGame(challengeFromHash()); };
     window.addEventListener('hashchange', syncSelection);
@@ -63,17 +68,21 @@ export default function App() {
   const selectedItem = items.find(item => item.entry.id === selected);
   const timeline = selectedItem?.timeline;
   const unknownScore = linkedScore !== undefined && !loading && !error && !selectedItem;
-  if (timeline && game) return <Challenge key={`${timeline.score.id}:${game}`} timeline={timeline} mode={game} onExit={() => { window.location.hash = encodeURIComponent(timeline.score.id); }} />;
+  // Refresh saved timing when entering practice, and share the same values with Debug.
+  const drumTiming = useMemo(loadDrumTiming, [timeline, game]);
   return <>
-    <header className="app-header"><a href={import.meta.env.BASE_URL} className="brand" aria-label="SLSCC Band home"><span className="brand-mark" aria-hidden="true" /><span>SLSCC <strong>Band</strong></span></a></header>
-    <div className={`app-layout${linkedScore === undefined ? ' score-landing-layout' : ''}`}>
-      {linkedScore === undefined ? <Catalogue landing items={items} onSelect={selectScore} query={query} onQuery={setQuery} loading={loading} error={error} /> : <>
-      <Catalogue items={items} selected={selected} onSelect={selectScore} query={query} onQuery={setQuery} loading={loading} error={error} />
-      {timeline ? <Practice key={timeline.score.id} timeline={timeline} onChallenge={mode => { window.location.hash = `${encodeURIComponent(timeline.score.id)}/${mode === 'drum' ? 'drum-challenge' : 'challenge'}`; }} /> : <main className="empty-state">
-        <h1>{unknownScore ? 'Score not found' : selectedItem?.error ? 'Cannot load score' : error ? 'Cannot load scores' : loading ? 'Loading scores…' : 'Select a score'}</h1>
-        {unknownScore ? <p className="error" role="alert">No score matches “{linkedScore}”. Choose another score from the list.</p> : selectedItem?.error || error ? <p className="error" role="alert">{selectedItem?.error || error}</p> : null}
-      </main>}
-      </>}
-    </div>
+    {timeline && game ? <Challenge key={`${timeline.score.id}:${game}`} timeline={timeline} mode={game} onExit={() => { window.location.hash = encodeURIComponent(timeline.score.id); }} /> : <>
+      <header className="app-header"><a href={import.meta.env.BASE_URL} className="brand" aria-label="SLSCC Band home"><span className="brand-mark" aria-hidden="true" /><span>SLSCC <strong>Band</strong></span></a></header>
+      <div className={`app-layout${linkedScore === undefined ? ' score-landing-layout' : ''}`}>
+        {linkedScore === undefined ? <Catalogue landing items={items} onSelect={selectScore} query={query} onQuery={setQuery} loading={loading} error={error} /> : <>
+          <Catalogue items={items} selected={selected} onSelect={selectScore} query={query} onQuery={setQuery} loading={loading} error={error} />
+          {timeline ? <Practice key={timeline.score.id} timeline={timeline} settings={practiceSettings} setSettings={setPracticeSettings} drumTiming={drumTiming} onChallenge={mode => { window.location.hash = `${encodeURIComponent(timeline.score.id)}/${mode === 'drum' ? 'drum-challenge' : 'challenge'}`; }} /> : <main className="empty-state">
+            <h1>{unknownScore ? 'Score not found' : selectedItem?.error ? 'Cannot load score' : error ? 'Cannot load scores' : loading ? 'Loading scores…' : 'Select a score'}</h1>
+            {unknownScore ? <p className="error" role="alert">No score matches “{linkedScore}”. Choose another score from the list.</p> : selectedItem?.error || error ? <p className="error" role="alert">{selectedItem?.error || error}</p> : null}
+          </main>}
+        </>}
+      </div>
+    </>}
+    <AppFooter practiceSettings={practiceSettings} drumTiming={drumTiming} />
   </>;
 }

@@ -28,6 +28,8 @@ Audio, visuals and challenges consume the same interpreted timeline. Instrument 
 
 Repository-root `scores/` contains the canonical `.mscz` files. Filenames without the extension are stable score IDs used by configuration, metadata and shared links. Titles, composers and musical content come from the score XML.
 
+Use consistent, distinct MuseScore part names so practice preferences carry across pieces. The repertoire uses `Bell Lyre`, `Bell Lyre I`, `Bell Lyre II`, `Side Drum`, `Bass Drum` and `Cymbal`. Matching uses the exact name, so a part called `Drum` gets its own settings. Scores with other names still load. Duplicate names are ambiguous across pieces, so their settings stay specific to their score.
+
 Preparation runs before development and production builds, or explicitly with `npm run scores`. It discovers scores automatically, copies them to `public/generated/scores/` and writes `public/generated/catalogue.json`. Asset filenames contain content hashes to invalidate edited scores. Generated assets and `dist/` are disposable; source archives are preserved unchanged. Adding, changing or removing a score requires regeneration and a browser reload locally, or a rebuild and deployment in production.
 
 The browser loads and parses scores progressively, so available pieces can be used while others are still loading. Parsed timelines are cached for the session. A malformed score produces a per-file error without preventing other pieces from loading. All asset requests respect Vite's configured base URL.
@@ -84,17 +86,23 @@ Warnings remain available on the score/timeline models. The instrument views are
 
 ## Catalogue and practice interface
 
+The shared footer credits South Liverpool Sea Cadets and links to its website. **Debug** opens a read-only panel with the current values of browser-backed preferences, including practice settings and the drum animation timing in milliseconds. It shows the values in use, including defaults.
+
 Opening the bare URL shows a searchable home screen with no score selected. Pieces appear under **Drum solos** and **Full band pieces**, with descriptions below their titles. Solos use a drum icon and full band pieces a music note throughout the catalogue. Search matches titles, composers, descriptions and type labels.
 
 Selecting a piece opens practice and updates the URL fragment to its encoded filename ID, for example `#colonel-bogey`. Browser Back/Forward restores selections, and the bare URL returns to the home screen. Invalid or unreadable links show an error while leaving other scores available. Desktop practice retains a searchable sidebar with the active score highlighted; mobile uses a **Change score** dialog.
 
-The practice page has a compact piece heading, instrument view and control column. The visual panel heading shows a static part name for single-part scores and an instrument dropdown for scores with multiple parts. The dropdown renders inside the page and applies choices without waiting for native menu dismissal. It supports pointer/touch selection, keyboard navigation and type-ahead, with Escape to cancel and Enter, Space or Tab to confirm. Pointer selection releases focus; keyboard selection retains it until navigation moves elsewhere. The selected visual part is independent of the audio mix, so it is possible to follow a muted part. The controls provide:
+The practice page has a compact piece heading, instrument view and control column. The visual panel heading shows a static part name for single-part scores and an instrument dropdown for scores with multiple parts. The dropdown supports touch and keyboard navigation, including type-ahead, Escape to cancel and Enter, Space or Tab to confirm. Pointer selection releases focus, and keyboard selection retains it until navigation moves elsewhere. The displayed part is independent of the audio mix. The first part in MuseScore order is the default. A selected part is remembered by name. If a new piece lacks the saved part, its first part replaces the saved choice.
 
-- Play/pause, restart, a slider that seeks to bar starts, and the current/total written bar count. Slider steps follow the expanded performance, keeping repeat passes separately reachable and respecting pickups and tempo changes. Beat numbers and timestamps are omitted.
-- Tempo from 50–125%, presets of 50%, 60%, 80%, 90% and 100%, and the effective crotchet BPM. Speed changes timing without changing pitch.
-- A metronome toggle that follows meter and tempo changes, accents downbeats and operates independently of the part mix.
-- An audio mixer collapsed by default, with 0–100% volume and Mute/Solo controls for every part. Multiple solos play together; mute takes precedence. Opening or closing the mixer leaves playback running. Volume percentages appear on hover or focus.
-- Available challenges below the audio controls, outside the instrument view.
+Playback controls provide Play/Pause, Restart, a slider that seeks to bar starts, and the current/total written bar count. Slider steps follow the expanded performance, keeping repeat passes separately reachable and respecting pickups and tempo changes. Changing pieces starts the new piece paused at the first bar.
+
+The **Practice settings** panel groups preferences that carry across pieces and browser reloads, with the displayed part saved alongside these settings in browser storage:
+
+- Tempo from 50–125% of written tempo, presets of 50%, 60%, 80%, 90% and 100%, and the effective crotchet BPM. Speed changes timing without changing pitch.
+- A metronome enabled by default. It follows meter and tempo changes, accents downbeats and operates independently of the part mix.
+- An audio mixer with 0–100% volume and Mute/Solo controls for every part. Multiple solos play together and mute takes precedence. The metronome has its own 0–100% volume slider, set to 100% by default. Turning the metronome off greys out its mixer row, disables its slider and retains the chosen level. Any adjustment to a visible part or to metronome volume keeps the mixer open. At default levels with mute and solo off, the mixer can be closed again and starts collapsed on a new piece. Settings for absent parts are retained for pieces where they apply. Opening or closing the mixer leaves playback running. Volume percentages appear on hover or focus.
+
+**Reset** restores 100% tempo, enables the metronome and sets it to full volume. It restores full volume and clears mute and solo for all parts across pieces while preserving the displayed part and playback position. Available challenges appear below the settings panel.
 
 Current and next played bars appear below the instrument as compact rhythm strips for a single note at a time per part. Each has a bare bar number on the left, numbered beats and lighter subdivision lines; time signatures are omitted. Note centres retain exact proportional musical positions through tempo changes. Labels stay stationary and use one level where they fit; crowded notes stagger into closely spaced rows without shifting sideways or shrinking text. Vertical placement has no pitch meaning. Every full bar remains visible without horizontal scrolling. Both bar slots have a fixed height, including silent bars and the end-of-score placeholder, so controls below stay stationary as note density changes. Active notes have a circular highlight behind the lettering, using the same pale blue as the selected tempo preset. Rests leave blank space, with Rest shown for a fully silent bar. Rolls/flams are labelled, and tied continuations say Hold. Pickups occupy their trailing fraction of a full bar; compound meters group dotted-crotchet beats. A playhead tracks playback. Pitch labels use sharps and distinguish octaves; tempo remains crotchet BPM.
 
@@ -108,7 +116,7 @@ Playback begins after a user action unlocks Web Audio. The transport schedules a
 
 Pause, seek, restart, speed changes and score changes cancel scheduled sources and clear snare reverb. Held pitched notes are restored when resuming or seeking into their duration. Missed scheduling windows after background delays do not replay old attacks in a burst. Suspended audio pauses practice and prompts the user to resume; interrupted challenges require a fresh attempt.
 
-Per-part gain nodes apply volume, mute and solo immediately to current and scheduled audio. Practice continues scheduling muted notes so unmuting a held sound is immediate. Challenge mixes are fixed for the attempt and skip muted synthesis. Switching the practice metronome cancels only click voices and preserves instrument playback.
+Per-part gain nodes apply volume, mute and solo immediately to current and scheduled audio. Practice continues scheduling muted notes so unmuting a held sound is immediate. Challenge mixes are fixed for the attempt and skip muted synthesis. The practice metronome uses a separate gain control, so adjusting its volume leaves instrument audio and the playback clock running. Its on/off switch cancels only click voices. Challenge clicks and count-ins use fixed levels.
 
 All sounds, including challenge taps, count-ins and feedback, pass through a shared master output with a fixed gain of two. Overall listening volume is controlled on the device. Soft limiting controls overlapping peaks at the amplified level while preserving quieter dynamics; a final peak guard catches oversampling-filter overshoots before the device output.
 
