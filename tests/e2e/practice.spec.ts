@@ -105,6 +105,144 @@ test('single-part pieces have a static instrument heading with the same header h
   }
 });
 
+test('practice settings survive a score change and reload, and reset across the repertoire', async ({ page }) => {
+  await page.goto('./#balaklava');
+  const settings = page.getByRole('region', { name: 'Practice settings' });
+  const playback = page.getByRole('region', { name: 'Playback controls' });
+  const picker = page.getByRole('combobox', { name: 'Visualised instrument' });
+  const metronome = settings.getByRole('switch', { name: 'Metronome' });
+  const tempo = settings.getByRole('slider', { name: 'Tempo' });
+  const seek = playback.getByRole('slider', { name: 'Playback position' });
+  const mixer = settings.locator('.mixer-heading');
+  const volume = settings.getByRole('slider', { name: 'Side Drum volume' });
+  const mute = settings.getByRole('button', { name: 'Mute Side Drum' });
+  const solo = settings.getByRole('button', { name: 'Solo Cymbal' });
+
+  await expect(metronome).toBeChecked();
+  await chooseInstrument(page, 'Cymbal');
+  await settings.getByRole('button', { name: '80%' }).click();
+  await metronome.uncheck();
+  await mixer.click();
+  await volume.fill('37');
+  await mute.click();
+  await solo.click();
+  await seek.fill('4');
+
+  await page.getByRole('button', { name: /The Captain General/ }).click();
+  await expect(page).toHaveURL(/#the-captain-general$/);
+  await expect(playback.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+  await expect(seek).toHaveValue('1');
+  await expect(picker).toHaveText('Cymbal');
+  await expect(tempo).toHaveValue('80');
+  await expect(metronome).not.toBeChecked();
+  await expect(volume).toHaveValue('37');
+  await expect(mute).toHaveAttribute('aria-pressed', 'true');
+  await expect(solo).toHaveAttribute('aria-pressed', 'true');
+
+  await page.reload();
+  await expect(picker).toHaveText('Cymbal');
+  await expect(tempo).toHaveValue('80');
+  await expect(metronome).not.toBeChecked();
+  await expect(volume).toHaveValue('37');
+
+  await page.getByRole('button', { name: /Colonel Bogey/ }).click();
+  await expect(picker).toHaveText('Bell Lyre');
+  await page.getByRole('button', { name: /Balaklava/ }).click();
+  await expect(picker).toHaveText('Bell Lyre');
+  await expect(solo).toHaveAttribute('aria-pressed', 'true');
+
+  await page.getByRole('button', { name: /Colonel Bogey/ }).click();
+  await chooseInstrument(page, 'Side Drum');
+  await seek.fill('4');
+  await settings.getByRole('button', { name: 'Reset settings' }).click();
+  await expect(tempo).toHaveValue('100');
+  await expect(metronome).toBeChecked();
+  await expect(seek).toHaveValue('4');
+  await expect(picker).toHaveText('Side Drum');
+  await expect(mixer).not.toHaveAttribute('aria-disabled', 'true');
+  await page.getByRole('button', { name: /Balaklava/ }).click();
+  await expect(volume).toBeHidden();
+  await mixer.click();
+  await expect(volume).toHaveValue('100');
+  await expect(mute).toHaveAttribute('aria-pressed', 'false');
+  await expect(solo).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('the mixer stays open for adjusted parts and starts closed for a default mix', async ({ page }) => {
+  await page.goto('./#balaklava');
+  const mixer = page.locator('.part-controls details');
+  const heading = mixer.locator('summary');
+  const volume = page.getByRole('slider', { name: 'Cymbal volume' });
+
+  await expect(mixer).not.toHaveAttribute('open');
+  await heading.click();
+  await volume.fill('75');
+  await expect(heading).toHaveAttribute('aria-disabled', 'true');
+  await expect(heading.locator('svg')).toHaveCount(0);
+  await heading.click({ force: true });
+  await expect(volume).toBeVisible();
+  await heading.press('Enter');
+  await expect(volume).toBeVisible();
+
+  await page.getByRole('button', { name: /Colonel Bogey/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Colonel Bogey');
+  await expect(mixer).not.toHaveAttribute('open');
+  await page.getByRole('button', { name: /Balaklava/ }).click();
+  await expect(volume).toHaveValue('75');
+  await volume.fill('100');
+  await expect(heading).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(heading.locator('svg')).toBeVisible();
+  await heading.press('Enter');
+  await expect(mixer).not.toHaveAttribute('open');
+  await heading.click();
+  await expect(volume).toBeVisible();
+
+  await page.getByRole('button', { name: /The Captain General/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('The Captain General');
+  await expect(mixer).not.toHaveAttribute('open');
+});
+
+test('the shared footer links to Sea Cadets and Debug shows current persistent settings', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('band-trainer:drum-timing:v1', '{"visualOffset":35}'));
+  await page.goto('./');
+  const footer = page.getByRole('contentinfo');
+  const debug = footer.getByRole('button', { name: 'Debug' });
+  const panel = page.getByRole('dialog', { name: 'Persistent settings' });
+  const values = panel.locator('pre');
+
+  await expect(footer).toContainText('Developed by South Liverpool Sea Cadets');
+  await expect(footer.getByRole('link', { name: 'South Liverpool Sea Cadets' }))
+    .toHaveAttribute('href', 'https://www.sea-cadets.org/southliverpool');
+  await debug.click();
+  await expect(panel).toBeVisible();
+  expect(JSON.parse(await values.innerText())).toMatchObject({
+    practiceSettings: { speed: 1, metronome: true, partKey: null, mix: {} },
+    drumTimingMs: { visualOffset: 35, downstroke: 65 },
+  });
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  await expect(debug).toBeFocused();
+
+  await page.getByRole('button', { name: /Colonel Bogey/ }).click();
+  await page.setViewportSize({ width: 320, height: 568 });
+  await chooseInstrument(page, 'Side Drum');
+  await page.getByRole('button', { name: '80%', exact: true }).click();
+  await page.getByRole('switch', { name: 'Metronome' }).uncheck();
+  await page.locator('.mixer-heading').click();
+  await page.getByRole('slider', { name: 'Side Drum volume' }).fill('45');
+  await debug.click();
+  await expect(panel).toBeInViewport();
+  expect(JSON.parse(await values.innerText())).toMatchObject({
+    practiceSettings: { speed: 0.8, metronome: false, partKey: '["Side Drum"]', mix: { '["Side Drum"]': { volume: 0.45 } } },
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await panel.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Drum challenge', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Play for ten stars' })).toBeVisible();
+  await debug.click();
+  await expect(values).toContainText('"speed": 0.8');
+});
+
 test('desktop practice controls change real playback and keep following independent of listening', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -180,6 +318,8 @@ test('desktop practice controls change real playback and keep following independ
   await expect(page.locator('.key-signature, .column-label')).toHaveCount(0);
   await expect(page.locator('.catalogue .score-list')).not.toContainText(/\d+ bars|\d+ parts/);
   await expect(page.locator('.piece-meta')).toHaveCount(0);
+  await chooseInstrument(page, 'Bell Lyre');
+  await page.getByRole('button', { name: '100%', exact: true }).click();
   await expect(page.locator('.bar-notes-row.current')).toHaveAttribute('aria-label', 'Current bar 1');
   await expect(page.locator('.bar-notes-row.queued')).toHaveAttribute('aria-label', 'Next bar 2');
   await expect(page.locator('.lyre-bar')).toHaveCount(25);
@@ -313,6 +453,8 @@ test('Web Audio produces a signal, immediately mutes it, and keeps the visual tr
   const rms = () => page.evaluate(() => (window as unknown as { audioRms?: () => number }).audioRms?.() || 0);
   await page.goto('./#16obr');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('16 Bar Off Beat Routine (16 OBR)');
+  const metronome = page.getByRole('switch', { name: 'Metronome' });
+  await metronome.uncheck();
   await page.locator('.part-controls summary').click();
   await page.getByRole('button', { name: 'Solo Side Drum' }).click();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
@@ -327,7 +469,6 @@ test('Web Audio produces a signal, immediately mutes it, and keeps the visual tr
   await expect.poll(rms, { intervals: [30], timeout: 3000 }).toBeGreaterThan(0.0001);
   await page.getByRole('button', { name: 'Mute Side Drum' }).click();
   await expect.poll(rms, { intervals: [30] }).toBeLessThan(0.000001);
-  const metronome = page.getByRole('switch', { name: 'Metronome' });
   await metronome.check();
   await expect.poll(rms, { intervals: [15], timeout: 3000 }).toBeGreaterThan(0.0001);
   await metronome.uncheck();

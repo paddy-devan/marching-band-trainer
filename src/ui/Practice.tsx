@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
 import { Transport, type Mix } from '../audio/transport';
 import type { Timeline } from '../score/model';
 import { positionAt } from '../score/interpret';
@@ -10,24 +10,61 @@ import { highlightedMovements } from './cues';
 import { PartControls } from './PartControls';
 import { TransportControls } from './TransportControls';
 import { playableDrums, playableLyres, type ChallengeMode } from '../game/parts';
-import { DEFAULT_DRUM_TIMING, DRUM_TIMING_STORAGE_KEY, parseDrumTiming } from './drum-timing';
+import type { DrumTiming } from './drum-timing';
+import { DEFAULT_PRACTICE_SETTINGS, practicePartKeys, type PracticeSettings } from './practice-settings';
 
-export function Practice({ timeline, onChallenge }: { timeline: Timeline; onChallenge: (mode: ChallengeMode) => void }) {
+type Props = {
+  timeline: Timeline;
+  onChallenge: (mode: ChallengeMode) => void;
+  settings: PracticeSettings;
+  setSettings: Dispatch<SetStateAction<PracticeSettings>>;
+  drumTiming: DrumTiming;
+};
+
+export function Practice({ timeline, onChallenge, settings, setSettings, drumTiming }: Props) {
   const score = timeline.score;
-  const [transport] = useState(() => new Transport(timeline));
-  const state = useSyncExternalStore(transport.subscribe, transport.getSnapshot);
-  const [selected, setSelected] = useState(score.parts[0].id);
-  const hasMultipleParts = score.parts.length > 1;
-  const [mix, setMix] = useState<Mix>(() => Object.fromEntries(score.parts.map(p => [p.id, { muted: false, solo: false }])));
-  const [timing] = useState(() => {
-    try { return parseDrumTiming(localStorage.getItem(DRUM_TIMING_STORAGE_KEY)); }
-    catch { return { ...DEFAULT_DRUM_TIMING }; }
+  const partKeys = useMemo(() => practicePartKeys(score.parts), [score.parts]);
+  const mix = useMemo<Mix>(() => Object.fromEntries([...partKeys].flatMap(([id, key]) => (
+    settings.mix[key] ? [[id, settings.mix[key]]] : []
+  ))), [partKeys, settings.mix]);
+  const [transport] = useState(() => {
+    const transport = new Transport(timeline);
+    transport.setSpeed(settings.speed);
+    transport.setMetronome(settings.metronome);
+    transport.setMix(mix);
+    return transport;
   });
+  const state = useSyncExternalStore(transport.subscribe, transport.getSnapshot);
+  const part = score.parts.find(p => partKeys.get(p.id) === settings.partKey) ?? score.parts[0];
+  const selectedKey = partKeys.get(part.id)!;
+  const hasMultipleParts = score.parts.length > 1;
   const readPosition = useCallback(() => transport.readPosition(), [transport]);
   useEffect(() => () => transport.dispose(), [transport]);
-  const changeMix = (next: Mix) => { transport.setMix(next); setMix(next); };
-  const part = score.parts.find(p => p.id === selected)!;
-  const partMovements = useMemo(() => timeline.movements.filter(m => m.partId === selected), [timeline, selected]);
+  const preferredKey = settings.partKey;
+  useEffect(() => {
+    if (preferredKey === undefined || preferredKey === selectedKey) return;
+    setSettings(current => current.partKey === preferredKey ? { ...current, partKey: selectedKey } : current);
+  }, [preferredKey, selectedKey, setSettings]);
+  const changeSpeed = (speed: number) => {
+    if (state.speed !== speed) transport.setSpeed(speed);
+    setSettings(current => ({ ...current, speed }));
+  };
+  const changeMetronome = (metronome: boolean) => {
+    transport.setMetronome(metronome);
+    setSettings(current => ({ ...current, metronome }));
+  };
+  const changePartMix = (id: string, next: Mix[string]) => {
+    transport.setMix({ ...mix, [id]: next });
+    setSettings(current => ({ ...current, mix: { ...current.mix, [partKeys.get(id)!]: next } }));
+  };
+  const resetSettings = () => {
+    const { speed, metronome, mix } = DEFAULT_PRACTICE_SETTINGS;
+    transport.setMix(mix);
+    if (state.speed !== speed) transport.setSpeed(speed);
+    transport.setMetronome(metronome);
+    setSettings(current => ({ ...DEFAULT_PRACTICE_SETTINGS, partKey: current.partKey }));
+  };
+  const partMovements = useMemo(() => timeline.movements.filter(m => m.partId === part.id), [timeline, part.id]);
   const active = highlightedMovements(partMovements, state.position, state.speed);
   const beats = positionAt(score, state.position);
   const measure = score.measures.find(m => beats >= value(m.start) - 1e-8 && beats < value(m.start) + value(m.duration) - 1e-8) || score.measures.at(-1)!;
@@ -40,14 +77,15 @@ export function Practice({ timeline, onChallenge }: { timeline: Timeline; onChal
       <section className="visual-panel" aria-labelledby="visual-title">
         <div className="visual-heading">
           <h2 id="visual-title" className={hasMultipleParts ? 'sr-only' : 'instrument-name'}>{part.name}</h2>
-          {hasMultipleParts ? <InstrumentPicker parts={score.parts} selected={selected} onChange={setSelected} /> : null}
+          {hasMultipleParts ? <InstrumentPicker parts={score.parts} selected={part.id} onChange={id => setSettings(current => ({ ...current, partKey: partKeys.get(id)! }))} /> : null}
         </div>
-        <div className="instrument-stage"><InstrumentView part={part} active={active} position={state.position} movements={partMovements} speed={state.speed} playing={state.playing} drumTiming={timing} readPosition={readPosition} /></div>
+        <div className="instrument-stage"><InstrumentView part={part} active={active} position={state.position} movements={partMovements} speed={state.speed} playing={state.playing} drumTiming={drumTiming} readPosition={readPosition} /></div>
         <BarNotes score={score} part={part} movements={partMovements} measure={measure} position={state.position} active={active} />
       </section>
       <div className="control-column">
-        <TransportControls transport={transport} state={state} timeline={timeline} measure={measure} bpm={tempo.bpm}>
-          <PartControls parts={score.parts} mix={mix} onMix={changeMix} />
+        <TransportControls transport={transport} state={state} timeline={timeline} measure={measure} bpm={tempo.bpm}
+          onSpeed={changeSpeed} onMetronome={changeMetronome} onReset={resetSettings}>
+          <PartControls parts={score.parts} mix={mix} onPartMix={changePartMix} />
         </TransportControls>
         {hasLyre || hasDrum ? <section className="challenge-launcher" aria-labelledby="challenges-title">
           <h2 id="challenges-title">Challenges</h2>

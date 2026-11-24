@@ -35,6 +35,7 @@ test('a soloed sampled cymbal sounds in practice and its ringing tail obeys mute
   await expect(page).toHaveURL(/#heart-of-oak$/);
   await expect(page.locator('.practice .piece-heading h1')).toHaveText('Heart of Oak');
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+  await page.getByRole('switch', { name: 'Metronome' }).uncheck();
   await page.locator('.part-controls summary').click();
   await expect(page.getByRole('button', { name: 'Solo Cymbal', exact: true })).toBeVisible();
   const firstCrash = await page.evaluate(async () => {

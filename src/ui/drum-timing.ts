@@ -30,6 +30,11 @@ export function parseDrumTiming(raw: string | null): DrumTiming {
   return result;
 }
 
+export function loadDrumTiming(): DrumTiming {
+  try { return parseDrumTiming(localStorage.getItem(DRUM_TIMING_STORAGE_KEY)); }
+  catch { return { ...DEFAULT_DRUM_TIMING }; }
+}
+
 type DrumGesture = Movement & { rollEnd?: number };
 
 export function drumLanes(movements: Movement[]) {
