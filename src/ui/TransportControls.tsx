@@ -38,7 +38,7 @@ export function TransportControls({ transport, state, timeline, measure, bpm, on
     <section className="practice-settings" aria-labelledby="practice-settings-title">
       <header className="practice-settings-heading">
         <h2 id="practice-settings-title">Practice settings</h2>
-        <button type="button" className="reset-settings-button" onClick={onReset}>Reset settings</button>
+        <button type="button" className="reset-settings-button" onClick={onReset}>Reset</button>
       </header>
       <div className="practice-settings-panel">
         <div className="tempo-controls">

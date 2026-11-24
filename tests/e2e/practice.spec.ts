@@ -171,7 +171,7 @@ test('practice settings survive a score change and reload, and reset across the 
   await page.getByRole('button', { name: /Colonel Bogey/ }).click();
   await chooseInstrument(page, 'Side Drum');
   await seek.fill('4');
-  await settings.getByRole('button', { name: 'Reset settings' }).click();
+  await settings.getByRole('button', { name: 'Reset' }).click();
   await expect(tempo).toHaveValue('100');
   await expect(metronome).toBeChecked();
   await expect(seek).toHaveValue('4');
