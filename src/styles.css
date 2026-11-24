@@ -354,12 +354,10 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
 .drum-board { display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; max-width: 520px; margin: 0 auto; padding: 8px; border: 1px solid #cfdee5; border-radius: 18px; background: #dbe7ec; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .drum-board:focus { outline: none; }
 .drum-track { position: relative; flex: 1; min-height: 0; margin: 0 8px; overflow: hidden; border-radius: 10px 10px 0 0; background: linear-gradient(180deg, #ecf4f7, #f8fbfc); }
-.drum-lane { position: absolute; top: 0; bottom: 0; width: 50%; }
-.drum-lane.left { left: 0; border-right: 1px solid #d3e2e9; }
-.drum-lane.right { right: 0; }
 /* Leave room below the outline centres for late hits and departing notes. */
 .drum-cues { position: absolute; inset: 0 0 calc(7% + 30px); }
-.drum-bar-line, .drum-strike-line { position: absolute; inset: 0 0 auto; border-top: 1px solid #a9bec8; }
+.drum-bar-line, .drum-beat-line, .drum-strike-line { position: absolute; inset: 0 0 auto; border-top: 1px solid #a9bec8; }
+.drum-beat-line { border-color: #c4d3da; }
 .drum-strike-line { top: 100%; border-color: #708c99; }
 .drum-cue-bar { position: absolute; height: 28px; border-radius: 6px; transform: translateY(-50%); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 750; }
 .drum-cue-bar.left { left: 5%; width: 40%; }
@@ -374,12 +372,12 @@ input[type='range'] { width: 100%; margin: 0; accent-color: var(--cyan-dark); he
 .drum-note[data-hit="perfect"] { --pop-fill: #f6cf48; --pop-rim: #ab7510; }
 .drum-note[data-hit="good"] { --pop-fill: #69dfa1; --pop-rim: #177d51; }
 .drum-note[data-hit="okay"] { --pop-fill: #f8aa62; --pop-rim: #a75824; }
-.drum-note[data-hit] .drum-note-face { background: var(--pop-fill); border: 2px solid var(--pop-rim); color: #263329; text-transform: capitalize; box-shadow: 0 3px 0 var(--pop-rim); animation: drum-note-pop 220ms ease-out both; }
+.drum-note[data-hit] .drum-note-face { background: var(--pop-fill); border: 2px solid var(--pop-rim); color: #263329; text-transform: capitalize; box-shadow: 0 3px 0 var(--pop-rim); animation: drum-note-pop 150ms ease-out both; }
 @keyframes drum-note-pop {
-  0% { transform: scale(1.03, .76); }
-  30% { transform: scale(1.09, 1.18); }
-  60% { transform: scale(1.04, 1); opacity: 1; }
-  100% { transform: scale(1.08, 1); opacity: 0; }
+  0% { transform: scale(.98, .64); }
+  18% { transform: scale(1.10, 1.25); }
+  50% { transform: scale(1.02, 1); opacity: 1; animation-timing-function: ease-in; }
+  100% { transform: scale(1.06, .96); opacity: 0; }
 }
 .drum-hit-target { top: 100%; border: 2px solid #0787a2; color: #0787a2; pointer-events: none; }
 .drum-hit-target.right { border-color: #7950b4; color: #7950b4; }

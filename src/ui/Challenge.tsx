@@ -211,7 +211,7 @@ export function Challenge({ timeline, mode, onExit }: { timeline: Timeline; mode
           </span> : null}
         </>}
       </div>
-      {drum ? <DrumBoard upcoming={view.upcoming} barLines={view.barLines} eitherHand={view.eitherHand} position={position.current} speed={settings.speed} preview={settings.preview} animationRef={drumAnimation} feedback={visibleFeedback} onTap={tap} />
+      {drum ? <DrumBoard upcoming={view.upcoming} guideLines={view.guideLines} eitherHand={view.eitherHand} position={position.current} speed={settings.speed} preview={settings.preview} animationRef={drumAnimation} feedback={visibleFeedback} onTap={tap} />
         : <LyreBoard part={part} cuePitches={cuePitches} feedback={visibleFeedback} onTap={tap} />}
     </>}
   </main>;

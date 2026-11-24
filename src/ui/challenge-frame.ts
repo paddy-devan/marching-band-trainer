@@ -1,4 +1,4 @@
-import { countIn } from '../audio/beats';
+import { countIn, metronomeClicks, type Click } from '../audio/beats';
 import type { Attempt, HitGrade, Target } from '../game/scoring';
 import { TargetIndex } from '../game/target-index';
 import { secondsAt } from '../score/interpret';
@@ -10,7 +10,7 @@ export const DRUM_LOOK_AHEAD = 2;
 export const DRUM_RUNOUT = 0.4;
 export type DrumCue = { target: Target; hit?: { grade: HitGrade; at: number } };
 export type ChallengeFrame = {
-  bar: number; count: number; cuePitches: Set<number>; upcoming: DrumCue[]; barLines: number[];
+  bar: number; count: number; cuePitches: Set<number>; upcoming: DrumCue[]; guideLines: Click[];
   eitherHand: boolean; feedback?: Feedback; perfectStreak: number;
 };
 
@@ -18,18 +18,19 @@ export type ChallengeFrame = {
 // position belongs to the animation loop, not the component tree.
 export class ChallengeFrames {
   private index: TargetIndex;
-  private measures: { start: number; end: number; bar: number; time: number }[];
+  private measures: { start: number; end: number; bar: number }[];
   private tempos: { time: number; position: number; bpm: number }[];
+  private beats: Click[];
   private leadIn;
   private previous?: ChallengeFrame;
   private cuePitches = new Set<number>();
   private upcoming: DrumCue[] = [];
-  private barLines: number[] = [];
+  private guideLines: Click[] = [];
   constructor(timeline: Timeline, private targets: Target[], private speed: number, private drum: boolean, private preview: boolean) {
     this.index = new TargetIndex(targets);
-    this.measures = timeline.score.measures.map(m => ({ start: value(m.start), end: value(add(m.start, m.duration)),
-      bar: (m.sourceIndex ?? m.index) + 1, time: secondsAt(timeline.score, m.start) }));
+    this.measures = timeline.score.measures.map(m => ({ start: value(m.start), end: value(add(m.start, m.duration)), bar: (m.sourceIndex ?? m.index) + 1 }));
     this.tempos = timeline.score.tempos.map(t => ({ time: secondsAt(timeline.score, t.position), position: value(t.position), bpm: t.bpm }));
+    this.beats = drum && preview ? metronomeClicks(timeline) : [];
     this.leadIn = countIn(timeline);
   }
   read(position: number, attempt?: Attempt, feedback?: Feedback): ChallengeFrame {
@@ -58,20 +59,24 @@ export class ChallengeFrames {
     const perfectStreak = attempt?.perfectStreak().current ?? 0;
     const cuePitches = this.cuePitches;
     const upcoming = this.upcoming;
-    const barLines = this.barLines;
+    const guideLines = this.guideLines;
     cuePitches.clear();
     upcoming.length = 0;
-    barLines.length = 0;
+    guideLines.length = 0;
     let eitherHand = false;
     if (this.preview) {
       if (this.drum) {
         const from = position - DRUM_RUNOUT * this.speed;
         const to = position + DRUM_LOOK_AHEAD * this.speed;
-        // Reuse the measure lookup, stepping back for lines below the hit line.
-        let measureIndex = low;
-        while (measureIndex > 0 && this.measures[measureIndex - 1].time >= from) measureIndex--;
-        for (; measureIndex < this.measures.length && this.measures[measureIndex].time <= to; measureIndex++) {
-          barLines.push(this.measures[measureIndex].time);
+        low = 0;
+        high = this.beats.length;
+        while (low < high) {
+          const middle = (low + high) >>> 1;
+          if (this.beats[middle].time < from) low = middle + 1;
+          else high = middle;
+        }
+        for (let i = low; i < this.beats.length && this.beats[i].time <= to; i++) {
+          guideLines.push(this.beats[i]);
         }
         let next: Target | undefined;
         for (let i = this.index.lowerBound(from); i < this.targets.length; i++) {
@@ -97,13 +102,13 @@ export class ChallengeFrames {
       const cue = previous.upcoming[i];
       return target === cue.target && hit?.grade === cue.hit?.grade && hit?.at === cue.hit?.at;
     });
-    const sameBarLines = previous && previous.barLines.length === barLines.length && barLines.every((time, i) => time === previous.barLines[i]);
+    const sameGuideLines = previous && previous.guideLines.length === guideLines.length && guideLines.every((line, i) => line === previous.guideLines[i]);
     const samePitches = previous && previous.cuePitches.size === cuePitches.size && this.samePitches(previous.cuePitches);
     if (previous && previous.bar === bar && previous.count === count && previous.feedback === visibleFeedback
       && previous.perfectStreak === perfectStreak && previous.eitherHand === eitherHand
-      && sameUpcoming && sameBarLines && samePitches) return previous;
+      && sameUpcoming && sameGuideLines && samePitches) return previous;
     return this.previous = { bar, count, cuePitches: samePitches ? previous!.cuePitches : new Set(cuePitches),
-      upcoming: sameUpcoming ? previous!.upcoming : upcoming.slice(), barLines: sameBarLines ? previous!.barLines : barLines.slice(),
+      upcoming: sameUpcoming ? previous!.upcoming : upcoming.slice(), guideLines: sameGuideLines ? previous!.guideLines : guideLines.slice(),
       eitherHand, feedback: visibleFeedback, perfectStreak };
   }
   private samePitches(previous: Set<number>) {

@@ -141,7 +141,7 @@ test('cues off gives no prompts while wrong hands miss, either hands score, and 
   await page.getByLabel('Advance note cues').uncheck();
   await page.getByRole('button', { name: 'Start attempt' }).click();
   await expect(page.locator('.drum-note')).toHaveCount(0);
-  await expect(page.locator('.drum-bar-line, .drum-strike-line, .drum-hit-target, .drum-hit-label')).toHaveCount(0);
+  await expect(page.locator('.drum-bar-line, .drum-beat-line, .drum-strike-line, .drum-hit-target, .drum-hit-label')).toHaveCount(0);
   await page.screenshot({ path: path.join(tmpdir(), 'marching-band-drum-cues-off.png') });
   await strikeScheduled(page, 0, 'R');
   await expect(page.locator('.game-playing-status')).toContainText('Wrong hand');
@@ -206,6 +206,7 @@ test('falling bars exactly overlap their outlines at the scored onset across scr
   await page.goto('./#16obr/drum-challenge');
   await page.getByRole('button', { name: '100%', exact: true }).click();
   await page.getByLabel('Drum backing').check();
+  await expect(page.getByLabel('Metronome', { exact: false })).not.toBeChecked();
   await page.getByRole('button', { name: 'Start attempt' }).click();
 
   for (const index of [0, 2]) {
@@ -221,9 +222,12 @@ test('falling bars exactly overlap their outlines at the scored onset across scr
       const when = data.strikes.filter(s => s.scheduled)[index].when;
       data.context.getOutputTimestamp = () => ({ contextTime: when, performanceTime: performance.now() });
     }, index);
-    const note = page.locator(`.drum-note[data-time="${index / 2}"]`);
+    const time = index / 2;
+    const note = page.locator(`.drum-note[data-time="${time}"]`);
     const outline = page.locator(`.drum-hit-target.${index === 0 ? 'left' : 'either'}`);
+    const guide = page.locator(`.drum-${index === 0 ? 'bar' : 'beat'}-line[data-time="${time}"]`);
     await expect(outline).toBeVisible();
+    await expect(guide).toHaveCSS('border-top-color', index === 0 ? 'rgb(169, 190, 200)' : 'rgb(196, 211, 218)');
     for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 1440, height: 1000 }]) {
       await page.setViewportSize(viewport);
       await expect.poll(async () => {
@@ -233,10 +237,8 @@ test('falling bars exactly overlap their outlines at the scored onset across scr
       }, { intervals: [10] }).toBeLessThan(0.5);
       const bar = (await note.boundingBox())!;
       const target = (await outline.boundingBox())!;
-      if (index === 0) {
-        const line = (await page.locator('.drum-bar-line[data-time="0"]').boundingBox())!;
-        expect(line.y).toBeCloseTo(target.y + target.height / 2, 1);
-      }
+      const line = (await guide.boundingBox())!;
+      expect(line.y).toBeCloseTo(target.y + target.height / 2, 1);
       expect(bar.x).toBeCloseTo(target.x, 1);
       expect(bar.width).toBeCloseTo(target.width, 1);
       expect(bar.height).toBeCloseTo(target.height, 1);

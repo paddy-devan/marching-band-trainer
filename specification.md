@@ -133,11 +133,11 @@ Both modes share setup, count-in, progress, streaks, results, retry and interrup
 | Behaviour | Bell lyre | Drum |
 | --- | --- | --- |
 | Input | Touch, mouse or keyboard activation of pitched bars; simultaneous fingers supported. | Left/right pads using separate touch pointers, mouse, F/J or focused button activation. Held keys do not repeat. |
-| Advance cues | Bar outlines up to 0.8 seconds before an attack. | Falling notes with a two-second preview, matching left/right or a neutral Either lane. Measure lines scroll at the written bar boundaries in playback order. |
+| Advance cues | Bar outlines up to 0.8 seconds before an attack. | Falling notes with a two-second preview, matching left/right or a neutral Either lane. Bar lines mark measure boundaries and lighter beat lines mark the beats within each bar. Both scroll with the score, using the metronome's beat positions even when its audio is off. |
 | Accompaniment | Percussion remains audible; other pitched parts are muted. | Other parts remain audible. |
 | Selected part | Optional quieter automatic backing; every tap sounds its actual pitch independently. | Optional quieter drum backing; every tap sounds a snare strike independently. |
 
-Cues off hides note cues, measure lines and note pops while retaining pad and timing feedback. No haptics are used. Ties require one strike, repeated attacks remain separate, and duplicate voices at the same pitch/hand and onset need one physical strike. Chords and simultaneous opposite-hand drum targets accept separate fingers. Either drum pad can claim an unspecified-hand attack. A wrong-hand strike consumes the expected attack as a miss, cannot be corrected, and receives no additional extra-tap penalty. Both strokes of a flam are targets.
+Cues off hides note cues, bar and beat lines, and note pops while retaining pad and timing feedback. No haptics are used. Ties require one strike, repeated attacks remain separate, and duplicate voices at the same pitch/hand and onset need one physical strike. Chords and simultaneous opposite-hand drum targets accept separate fingers. Either drum pad can claim an unspecified-hand attack. A wrong-hand strike consumes the expected attack as a miss, cannot be corrected, and receives no additional extra-tap penalty. Both strokes of a flam are targets.
 
 ### Judgement and results
 
@@ -148,7 +148,7 @@ Input event timestamps are mapped to the same audio-output clock as the cues. De
 - Okay: remaining accepted hits within the window, at most ±150 ms; credit 0.3.
 - Misses earn zero; wrong/extra taps deduct 0.25 points. A successful target cannot be claimed twice.
 
-Drum hits pop where the cue was when the tap landed. Perfect is gold, Good is green and Okay is amber. Unhit cues, including wrong-hand misses, turn grey as they pass the hit line and fade out. A valid late tap can still pop a grey cue. The drum status shows Perfect, Early, Late, Wrong hand or Extra tap as applicable. Bell lyre shows Perfect feedback. A streak counter appears after three consecutive perfect attacks, with visual tiers at 10, 20 and 30. Other judgements and misses break the streak.
+Drum hits briefly compress and rebound where the tap landed, then fade. Perfect is gold, Good is green and Okay is amber. Unhit cues, including wrong-hand misses, turn grey as they pass the hit line and fade out. A valid late tap can still pop a grey cue. The drum status shows Perfect, Early, Late, Wrong hand or Extra tap as applicable. Bell lyre shows Perfect feedback. A streak counter appears after three consecutive perfect attacks, with visual tiers at 10, 20 and 30. Other judgements and misses break the streak.
 
 Stars equal the rounded result of `10 × (total hit credit − extra-tap penalties) / expected attacks`, clamped to 0–10. Assistance does not reduce available stars. Results show the settings, combined Early / late totals for Good and Okay hits, and longest perfect streak.
 

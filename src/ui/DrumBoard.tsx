@@ -1,12 +1,13 @@
 import { memo, useEffect, useImperativeHandle, useLayoutEffect, useRef, type RefObject } from 'react';
+import type { Click } from '../audio/beats';
 import type { Hand } from '../score/model';
 import type { Feedback } from './game-types';
 import { DRUM_LOOK_AHEAD, DRUM_RUNOUT, type DrumCue } from './challenge-frame';
 
 export type DrumAnimation = { update: (position: number) => void };
 
-export const DrumBoard = memo(function DrumBoard({ upcoming, barLines, eitherHand, position, speed, preview, animationRef, feedback, onTap }: {
-  upcoming: DrumCue[]; barLines: number[]; eitherHand: boolean; position: number; speed: number; preview: boolean;
+export const DrumBoard = memo(function DrumBoard({ upcoming, guideLines, eitherHand, position, speed, preview, animationRef, feedback, onTap }: {
+  upcoming: DrumCue[]; guideLines: Click[]; eitherHand: boolean; position: number; speed: number; preview: boolean;
   animationRef: RefObject<DrumAnimation | null>; feedback?: Feedback; onTap: (hand: Hand, timestamp: number) => void;
 }) {
   const board = useRef<HTMLDivElement>(null);
@@ -18,7 +19,7 @@ export const DrumBoard = memo(function DrumBoard({ upcoming, barLines, eitherHan
   const update = (at: number) => {
     currentPosition.current = at;
     const offset = (time: number, from = at) => (1 - (time - from) / speed / DRUM_LOOK_AHEAD) * height.current;
-    for (const time of barLines) {
+    for (const { time } of guideLines) {
       const node = lines.current.get(time);
       if (node) node.style.transform = `translateY(${offset(time)}px)`;
     }
@@ -31,8 +32,8 @@ export const DrumBoard = memo(function DrumBoard({ upcoming, barLines, eitherHan
       node.style.opacity = !hit && elapsed > 0 ? String(Math.max(0, 1 - elapsed / DRUM_RUNOUT)) : '';
     }
   };
-  useImperativeHandle(animationRef, () => ({ update }), [upcoming, barLines, speed]);
-  useLayoutEffect(() => { update(currentPosition.current); }, [upcoming, barLines, speed]);
+  useImperativeHandle(animationRef, () => ({ update }), [upcoming, guideLines, speed]);
+  useLayoutEffect(() => { update(currentPosition.current); }, [upcoming, guideLines, speed]);
   useLayoutEffect(() => {
     const node = cues.current;
     if (!node) return;
@@ -56,10 +57,9 @@ export const DrumBoard = memo(function DrumBoard({ upcoming, barLines, eitherHan
       onTap(key === 'f' ? 'L' : 'R', event.timeStamp);
     }}>
     <div className={`drum-track${preview ? '' : ' cues-off'}`} aria-hidden="true">
-      <div className="drum-lane left" /><div className="drum-lane right" />
       {preview ? <>
         <div className="drum-cues" ref={cues}>
-          {barLines.map(time => <div key={time} data-time={time} className="drum-bar-line"
+          {guideLines.map(({ time, accent }) => <div key={time} data-time={time} className={accent ? 'drum-bar-line' : 'drum-beat-line'}
             ref={node => { if (node) lines.current.set(time, node); else lines.current.delete(time); }} />)}
           <div className="drum-strike-line" />
           {eitherHand ? <div className="drum-cue-bar drum-hit-target either">Either</div> : <>

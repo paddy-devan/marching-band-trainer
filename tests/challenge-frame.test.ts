@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countIn } from '../src/audio/beats';
+import { countIn, metronomeClicks } from '../src/audio/beats';
 import { Attempt, drumTargets, gameTargets } from '../src/game/scoring';
 import { interpretScore, positionAt, secondsAt } from '../src/score/interpret';
 import { add, value } from '../src/score/fraction';
@@ -11,6 +11,7 @@ describe('challenge frame snapshots', () => {
     const timeline = interpretScore(fixture('colonel-bogey'));
     const leadIn = countIn(timeline);
     const barStarts = timeline.score.measures.map(m => secondsAt(timeline.score, m.start));
+    const clicks = metronomeClicks(timeline);
     for (const drum of [false, true]) {
       const part = timeline.score.parts.find(p => p.renderer === (drum ? 'snare' : 'lyre'))!;
       const targets = (drum ? drumTargets : gameTargets)(timeline, part, speed);
@@ -29,7 +30,8 @@ describe('challenge frame snapshots', () => {
         if (drum) {
           const from = position - DRUM_RUNOUT * speed, to = position + DRUM_LOOK_AHEAD * speed;
           expect(frame.upcoming.map(cue => cue.target)).toEqual(targets.filter(t => t.time >= from && t.time <= to));
-          expect(frame.barLines).toEqual(barStarts.filter(time => time >= from && time <= to));
+          expect(frame.guideLines).toEqual(clicks.filter(({ time }) => time >= from && time <= to));
+          expect(frame.guideLines.filter(line => line.accent).map(line => line.time)).toEqual(barStarts.filter(time => time >= from && time <= to));
           const next = targets.find(t => t.time + t.window * speed >= position && !attempt.isJudged(t.id));
           expect(frame.eitherHand).toBe(next !== undefined && !next.hand);
         } else {
