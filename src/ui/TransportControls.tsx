@@ -26,7 +26,7 @@ export function TransportControls({ transport, state, timeline, measure, bpm, on
     <div className="playback-row">
       <div className="transport-actions"><button className="play-button" aria-label={state.playing ? 'Pause' : 'Play'} onClick={() => state.playing ? transport.pause() : void transport.play()}>
         <svg viewBox="0 0 24 24" aria-hidden="true">{state.playing ? <path d="M7 5h4v14H7zM15 5h4v14h-4z" /> : <path d="m7 4 14 8-14 8z" />}</svg><span>{state.playing ? 'Pause' : 'Play'}</span></button>
-        <button className="restart-button" aria-label="Restart" title="Restart track" onClick={() => transport.restart()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7.4M3 4v7h7" /></svg><span>Restart</span></button></div>
+        <button className="restart-button" aria-label="Restart" title="Restart track" onClick={() => transport.restart()} /></div>
       <div className="playback-seek">
         <label className="sr-only" htmlFor="seek">Playback position</label>
         <Slider id="seek" aria-label="Playback position" aria-valuetext={barLabel} min={1} max={barStarts.length} step="1" value={measure.index + 1} disabled={barStarts.length < 2} onChange={e => transport.seek(barStarts[Number(e.target.value) - 1])} />
