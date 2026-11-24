@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { interpretScore, secondsAt } from '../src/score/interpret';
 import { parseScore } from '../src/score/parser';
 import { BarNotes, barCues, barRhythm, fitRhythmLabels } from '../src/ui/BarNotes';
@@ -11,9 +11,16 @@ const repeated = () => interpretScore(parseScore(synthetic([
   measure(time() + tempo(120) + chord() + chord() + chord('half')) + measure(chord('whole', 62)),
 ]), 'test'));
 
-describe('bar cues and shared strike highlights', () => {
+describe('Ready Aye Ready pickup', () => {
+  let timeline: ReturnType<typeof interpretScore>;
+
+  // Full-score parsing can take longer than the normal test timeout on CI.
+  beforeAll(() => {
+    timeline = interpretScore(fixture('ready-aye-ready'));
+  }, 30_000);
+
   it('shows only L Roll for the Ready Aye Ready quaver pickup in 6/8', () => {
-    const { score, movements } = interpretScore(fixture('ready-aye-ready'));
+    const { score, movements } = timeline;
     const part = score.parts.find(p => p.renderer === 'snare')!;
     const partMovements = movements.filter(m => m.partId === part.id);
     const html = renderToStaticMarkup(createElement(BarNotes, { score, part, movements: partMovements, measure: score.measures[0], position: 0, active: highlightedMovements(partMovements, 0) }));
@@ -22,6 +29,23 @@ describe('bar cues and shared strike highlights', () => {
     expect([...notes.querySelectorAll('.current .note-cue')].map(note => note.textContent)).toEqual(['L Roll']);
     expect(barCues(score, partMovements, score.measures[0])[0].end).toBe(secondsAt(score, score.measures[1].start));
   });
+
+  it('places a compound-meter pickup at the end of the bar without inventing rests', () => {
+    const { score, movements } = timeline;
+    const part = score.parts.find(part => part.renderer === 'snare')!;
+    const notes = movements.filter(m => m.partId === part.id);
+    const pickup = barRhythm(score, part, notes, score.measures[0]);
+    expect(pickup.pickup).toBe(true);
+    expect(pickup.cues).toHaveLength(1);
+    expect(pickup.cues[0].offset).toBeCloseTo(5 / 6, 10);
+    expect(pickup.cues[0].span).toBeCloseTo(1 / 6, 10);
+    const fullBar = barRhythm(score, part, notes, score.measures[1]);
+    expect(fullBar.beats.filter(beat => beat.label).map(beat => [beat.label, beat.offset])).toEqual([['1', 0], ['2', 0.5]]);
+    expect(fullBar.beats.some(beat => Math.abs(beat.offset - 1 / 6) < 1e-8 && !beat.major)).toBe(true);
+  });
+});
+
+describe('bar cues and shared strike highlights', () => {
   it('releases a repeated pitch briefly before lighting the next strike', () => {
     const { movements } = repeated();
     expect(highlightedMovements(movements, 0.4)).toEqual([movements[0]]);
@@ -171,19 +195,5 @@ describe('beat-proportional bar layout', () => {
     ]), 'rhythm'));
     const rhythm = barRhythm(score, score.parts[0], movements, score.measures[0]);
     [0, 1 / 12, 1 / 6, 0.25].forEach((offset, i) => expect(rhythm.cues[i].offset).toBeCloseTo(offset, 10));
-  });
-
-  it('places a compound-meter pickup at the end of the bar without inventing rests', () => {
-    const { score, movements } = interpretScore(fixture('ready-aye-ready'));
-    const part = score.parts.find(part => part.renderer === 'snare')!;
-    const notes = movements.filter(m => m.partId === part.id);
-    const pickup = barRhythm(score, part, notes, score.measures[0]);
-    expect(pickup.pickup).toBe(true);
-    expect(pickup.cues).toHaveLength(1);
-    expect(pickup.cues[0].offset).toBeCloseTo(5 / 6, 10);
-    expect(pickup.cues[0].span).toBeCloseTo(1 / 6, 10);
-    const fullBar = barRhythm(score, part, notes, score.measures[1]);
-    expect(fullBar.beats.filter(beat => beat.label).map(beat => [beat.label, beat.offset])).toEqual([['1', 0], ['2', 0.5]]);
-    expect(fullBar.beats.some(beat => Math.abs(beat.offset - 1 / 6) < 1e-8 && !beat.major)).toBe(true);
   });
 });
