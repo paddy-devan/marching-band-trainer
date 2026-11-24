@@ -4,6 +4,8 @@ import { TargetIndex } from './target-index';
 export type Target = { id: string; time: number; pitch: number; window: number; kind?: 'drum'; hand?: Hand };
 export type Strike = number | Hand;
 export type Judgement = 'Perfect' | 'Early' | 'Late' | 'Wrong note' | 'Wrong hand' | 'Extra tap';
+const hitCredit = { perfect: 1, good: 0.7, okay: 0.3 };
+export type HitGrade = keyof typeof hitCredit;
 export type Result = { stars: number; perfect: number; close: number; missed: number; extras: number; total: number; longestPerfectStreak: number };
 
 // Movements already contain expanded repeats and joined ties. Duplicate voices
@@ -45,7 +47,7 @@ function withTimingWindows(targets: Target[], speed: number): Target[] {
 }
 
 export class Attempt {
-  private judged = new Map<string, number>();
+  private judged = new Map<string, HitGrade | 'missed'>();
   private wrongHands = new Set<string>();
   private extras = 0;
   private hitEvents = new Map<string, { time: number; order: number }>();
@@ -63,7 +65,7 @@ export class Attempt {
       const target = this.targets[this.nextExpiry];
       if (target.time + target.window * this.speed >= position) break;
       this.nextExpiry++;
-      if (!this.judged.has(target.id)) { this.judged.set(target.id, 0); this.streakDirty = true; missed++; }
+      if (!this.judged.has(target.id)) { this.judged.set(target.id, 'missed'); this.streakDirty = true; missed++; }
     }
     return missed;
   }
@@ -77,7 +79,7 @@ export class Attempt {
     for (let i = this.index.lowerBound(position - radius); i < this.targets.length; i++) {
       const t = this.targets[i];
       if (t.time > position + radius) break;
-      if (!this.wrongHands.has(t.id) && (this.judged.get(t.id) ?? 0) === 0 && Math.abs(position - t.time) / this.speed <= t.window + 1e-8) available.push(t);
+      if (!this.wrongHands.has(t.id) && !this.hitGrade(t.id) && Math.abs(position - t.time) / this.speed <= t.window + 1e-8) available.push(t);
     }
     const target = available.filter(t => t.kind === 'drum'
       ? typeof strike === 'string' && (!t.hand || t.hand === strike)
@@ -90,7 +92,7 @@ export class Attempt {
       if (wrongHand) {
         // A wrong hand consumes the target as a miss, with no extra-tap penalty.
         // Unlike a provisional expired miss, it cannot later be corrected.
-        this.judged.set(wrongHand.id, 0);
+        this.judged.set(wrongHand.id, 'missed');
         this.wrongHands.add(wrongHand.id);
         this.hitEvents.set(wrongHand.id, { time: position, order: this.eventOrder++ });
         this.streakDirty = true;
@@ -104,14 +106,24 @@ export class Attempt {
     const error = (position - target.time) / this.speed;
     const distance = Math.abs(error);
     const perfect = distance <= Math.min(0.065, target.window * 0.65) + 1e-8;
-    const weight = perfect ? 1 : distance <= Math.min(0.1, target.window * 0.8) ? 0.7 : 0.3;
-    this.judged.set(target.id, weight);
+    const grade = perfect ? 'perfect' : distance <= Math.min(0.1, target.window * 0.8) ? 'good' : 'okay';
+    this.judged.set(target.id, grade);
     this.hitEvents.set(target.id, { time: position, order: this.eventOrder++ });
     this.streakDirty = true;
     return perfect ? 'Perfect' : error < 0 ? 'Early' : 'Late';
   }
 
   isJudged(id: string) { return this.judged.has(id); }
+
+  private hitGrade(id: string) {
+    const grade = this.judged.get(id);
+    return grade === 'missed' ? undefined : grade;
+  }
+
+  hit(id: string) {
+    const grade = this.hitGrade(id);
+    if (grade) return { grade, at: this.hitEvents.get(id)!.time };
+  }
 
   perfectStreak() {
     if (!this.streakDirty) return this.streak;
@@ -120,7 +132,7 @@ export class Attempt {
     const events = this.targets.filter(t => this.judged.has(t.id)).map(t => ({
       time: this.hitEvents.get(t.id)?.time ?? t.time + t.window * this.speed,
       order: this.hitEvents.get(t.id)?.order ?? -1,
-      perfect: this.judged.get(t.id) === 1,
+      perfect: this.hitGrade(t.id) === 'perfect',
     }));
     events.push(...this.extraEvents.map(e => ({ ...e, perfect: false })));
     events.sort((a, b) => a.time - b.time || a.order - b.order);
@@ -133,14 +145,14 @@ export class Attempt {
   }
 
   finish(): Result {
-    for (const target of this.targets) if (!this.judged.has(target.id)) { this.judged.set(target.id, 0); this.streakDirty = true; }
+    for (const target of this.targets) if (!this.judged.has(target.id)) { this.judged.set(target.id, 'missed'); this.streakDirty = true; }
     const values = [...this.judged.values()];
-    const points = values.reduce((sum, n) => sum + n, 0) - this.extras * 0.25;
+    const points = values.reduce((sum, grade) => sum + (grade === 'missed' ? 0 : hitCredit[grade]), 0) - this.extras * 0.25;
+    const perfect = values.filter(grade => grade === 'perfect').length;
+    const missed = values.filter(grade => grade === 'missed').length;
     return {
       stars: this.targets.length ? Math.round(10 * Math.max(0, points) / this.targets.length) : 0,
-      perfect: values.filter(n => n === 1).length,
-      close: values.filter(n => n > 0 && n < 1).length,
-      missed: values.filter(n => n === 0).length,
+      perfect, missed, close: values.length - perfect - missed,
       extras: this.extras, total: this.targets.length,
       longestPerfectStreak: this.perfectStreak().longest,
     };

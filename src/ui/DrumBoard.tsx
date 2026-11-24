@@ -1,29 +1,39 @@
 import { memo, useEffect, useImperativeHandle, useLayoutEffect, useRef, type RefObject } from 'react';
-import type { Target } from '../game/scoring';
+import type { Click } from '../audio/beats';
 import type { Hand } from '../score/model';
 import type { Feedback } from './game-types';
-import { DRUM_LOOK_AHEAD } from './challenge-frame';
+import { DRUM_LOOK_AHEAD, DRUM_RUNOUT, type DrumCue } from './challenge-frame';
 
 export type DrumAnimation = { update: (position: number) => void };
 
-export const DrumBoard = memo(function DrumBoard({ upcoming, eitherHand, position, speed, preview, animationRef, feedback, onTap }: {
-  upcoming: Target[]; eitherHand: boolean; position: number; speed: number; preview: boolean;
+export const DrumBoard = memo(function DrumBoard({ upcoming, guideLines, eitherHand, position, speed, preview, animationRef, feedback, onTap }: {
+  upcoming: DrumCue[]; guideLines: Click[]; eitherHand: boolean; position: number; speed: number; preview: boolean;
   animationRef: RefObject<DrumAnimation | null>; feedback?: Feedback; onTap: (hand: Hand, timestamp: number) => void;
 }) {
   const board = useRef<HTMLDivElement>(null);
   const cues = useRef<HTMLDivElement>(null);
   const notes = useRef(new Map<string, HTMLDivElement>());
+  const lines = useRef(new Map<number, HTMLDivElement>());
   const height = useRef(0);
   const currentPosition = useRef(position);
   const update = (at: number) => {
     currentPosition.current = at;
-    for (const target of upcoming) {
+    const offset = (time: number, from = at) => (1 - (time - from) / speed / DRUM_LOOK_AHEAD) * height.current;
+    for (const { time } of guideLines) {
+      const node = lines.current.get(time);
+      if (node) node.style.transform = `translateY(${offset(time)}px)`;
+    }
+    for (const { target, hit } of upcoming) {
       const node = notes.current.get(target.id);
-      if (node) node.style.transform = `translateY(${(1 - (target.time - at) / speed / DRUM_LOOK_AHEAD) * height.current}px) translateY(-50%)`;
+      if (!node) continue;
+      const elapsed = (at - target.time) / speed;
+      node.style.transform = `translateY(${offset(target.time, hit?.at)}px) translateY(-50%)`;
+      node.toggleAttribute('data-passed', !hit && elapsed > 0);
+      node.style.opacity = !hit && elapsed > 0 ? String(Math.max(0, 1 - elapsed / DRUM_RUNOUT)) : '';
     }
   };
-  useImperativeHandle(animationRef, () => ({ update }), [upcoming, speed]);
-  useLayoutEffect(() => { update(currentPosition.current); }, [upcoming, speed]);
+  useImperativeHandle(animationRef, () => ({ update }), [upcoming, guideLines, speed]);
+  useLayoutEffect(() => { update(currentPosition.current); }, [upcoming, guideLines, speed]);
   useLayoutEffect(() => {
     const node = cues.current;
     if (!node) return;
@@ -47,17 +57,19 @@ export const DrumBoard = memo(function DrumBoard({ upcoming, eitherHand, positio
       onTap(key === 'f' ? 'L' : 'R', event.timeStamp);
     }}>
     <div className={`drum-track${preview ? '' : ' cues-off'}`} aria-hidden="true">
-      <div className="drum-lane left" /><div className="drum-lane right" />
       {preview ? <>
         <div className="drum-cues" ref={cues}>
+          {guideLines.map(({ time, accent }) => <div key={time} data-time={time} className={accent ? 'drum-bar-line' : 'drum-beat-line'}
+            ref={node => { if (node) lines.current.set(time, node); else lines.current.delete(time); }} />)}
+          <div className="drum-strike-line" />
           {eitherHand ? <div className="drum-cue-bar drum-hit-target either">Either</div> : <>
             <div className="drum-cue-bar drum-hit-target left">L</div>
             <div className="drum-cue-bar drum-hit-target right">R</div>
           </>}
-          {upcoming.map(target => <div key={target.id} data-time={target.time}
+          {upcoming.map(({ target, hit }) => <div key={target.id} data-time={target.time} data-hit={hit?.grade}
             ref={node => { if (node) notes.current.set(target.id, node); else notes.current.delete(target.id); }}
             className={`drum-cue-bar drum-note ${target.hand === 'L' ? 'left' : target.hand === 'R' ? 'right' : 'either'}`}>
-            <span>{target.hand ?? 'Either'}</span>
+            <span className="drum-note-face">{hit?.grade ?? target.hand ?? 'Either'}</span>
           </div>)}
         </div>
         <span className="drum-hit-label">Hit when bars overlap the outlines</span>

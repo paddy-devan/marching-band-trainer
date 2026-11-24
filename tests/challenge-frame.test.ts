@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { countIn } from '../src/audio/beats';
+import { countIn, metronomeClicks } from '../src/audio/beats';
 import { Attempt, drumTargets, gameTargets } from '../src/game/scoring';
-import { interpretScore, positionAt } from '../src/score/interpret';
+import { interpretScore, positionAt, secondsAt } from '../src/score/interpret';
 import { add, value } from '../src/score/fraction';
-import { ChallengeFrames } from '../src/ui/challenge-frame';
+import { ChallengeFrames, DRUM_LOOK_AHEAD, DRUM_RUNOUT } from '../src/ui/challenge-frame';
 import { fixture } from './helpers';
 
 describe('challenge frame snapshots', () => {
   it.each([0.25, 0.75, 1.5])('preserves cues, count-in and repeat bar labels at %s speed', speed => {
     const timeline = interpretScore(fixture('colonel-bogey'));
     const leadIn = countIn(timeline);
+    const barStarts = timeline.score.measures.map(m => secondsAt(timeline.score, m.start));
+    const clicks = metronomeClicks(timeline);
     for (const drum of [false, true]) {
       const part = timeline.score.parts.find(p => p.renderer === (drum ? 'snare' : 'lyre'))!;
       const targets = (drum ? drumTargets : gameTargets)(timeline, part, speed);
@@ -26,7 +28,10 @@ describe('challenge frame snapshots', () => {
         expect(frame.bar).toBe((measure.sourceIndex ?? measure.index) + 1);
         expect(frame.count).toBe(position < 0 ? Math.min(leadIn.beats, Math.floor((position + leadIn.duration) / leadIn.interval) + 1) : 0);
         if (drum) {
-          expect(frame.upcoming).toEqual(targets.filter(t => (t.time - position) / speed <= 2 && (t.time - position) / speed >= -t.window && !attempt.isJudged(t.id)));
+          const from = position - DRUM_RUNOUT * speed, to = position + DRUM_LOOK_AHEAD * speed;
+          expect(frame.upcoming.map(cue => cue.target)).toEqual(targets.filter(t => t.time >= from && t.time <= to));
+          expect(frame.guideLines).toEqual(clicks.filter(({ time }) => time >= from && time <= to));
+          expect(frame.guideLines.filter(line => line.accent).map(line => line.time)).toEqual(barStarts.filter(time => time >= from && time <= to));
           const next = targets.find(t => t.time + t.window * speed >= position && !attempt.isJudged(t.id));
           expect(frame.eitherHand).toBe(next !== undefined && !next.hand);
         } else {
@@ -49,7 +54,7 @@ describe('challenge frame snapshots', () => {
     expect(frames.read(0.211, undefined, feedback).feedback).toBeUndefined();
     expect(tapped.feedback).toBe(feedback); // Published snapshots remain immutable.
   });
-  it('removes judged chord pitches and drum cues immediately without advancing the frame clock', () => {
+  it('publishes separate drum hits immediately and retains their original tap positions', () => {
     const timeline = interpretScore(fixture('colonel-bogey'));
     const targets = [
       { id: 'left', time: 1, pitch: 38, kind: 'drum' as const, hand: 'L' as const, window: 0.15 },
@@ -58,9 +63,25 @@ describe('challenge frame snapshots', () => {
     const attempt = new Attempt(targets, 1);
     const frames = new ChallengeFrames(timeline, targets, 1, true, true);
     expect(frames.read(1, attempt).upcoming).toHaveLength(2);
-    expect(attempt.tap('L', 1)).toBe('Perfect');
-    expect(frames.read(1, attempt).upcoming.map(t => t.id)).toEqual(['right']);
-    expect(attempt.tap('R', 1)).toBe('Perfect');
-    expect(frames.read(1, attempt).upcoming).toHaveLength(0);
+    expect(attempt.tap('L', 0.92)).toBe('Early');
+    expect(frames.read(1, attempt).upcoming.map(cue => cue.hit)).toEqual([{ grade: 'good', at: 0.92 }, undefined]);
+    expect(attempt.tap('R', 1.13)).toBe('Late');
+    const both = frames.read(1.13, attempt);
+    expect(both.upcoming.map(cue => cue.hit)).toEqual([{ grade: 'good', at: 0.92 }, { grade: 'okay', at: 1.13 }]);
+    expect(frames.read(1.14, attempt)).toBe(both);
+    expect(frames.read(1.41, attempt).upcoming).toHaveLength(0);
+  });
+
+  it('keeps missed and wrong-hand cues in the lane without a hit grade', () => {
+    const timeline = interpretScore(fixture('colonel-bogey'));
+    const targets = [1, 2].map(time => ({ id: String(time), time, pitch: 38, kind: 'drum' as const, hand: 'L' as const, window: 0.15 }));
+    const attempt = new Attempt(targets, 1);
+    const frames = new ChallengeFrames(timeline, targets, 1, true, true);
+    expect(attempt.tap('R', 0.95)).toBe('Wrong hand');
+    expect(frames.read(1.05, attempt).upcoming[0]).toEqual({ target: targets[0], hit: undefined });
+    attempt.advance(2.2);
+    expect(frames.read(2.2, attempt).upcoming).toEqual([{ target: targets[1], hit: undefined }]);
+    expect(attempt.tap('L', 2.02)).toBe('Perfect');
+    expect(frames.read(2.2, attempt).upcoming[0].hit).toEqual({ grade: 'perfect', at: 2.02 });
   });
 });

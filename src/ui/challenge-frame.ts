@@ -1,5 +1,5 @@
-import { countIn } from '../audio/beats';
-import type { Attempt, Target } from '../game/scoring';
+import { countIn, metronomeClicks, type Click } from '../audio/beats';
+import type { Attempt, HitGrade, Target } from '../game/scoring';
 import { TargetIndex } from '../game/target-index';
 import { secondsAt } from '../score/interpret';
 import { add, value } from '../score/fraction';
@@ -7,8 +7,10 @@ import type { Timeline } from '../score/model';
 import type { Feedback } from './game-types';
 
 export const DRUM_LOOK_AHEAD = 2;
+export const DRUM_RUNOUT = 0.4;
+export type DrumCue = { target: Target; hit?: { grade: HitGrade; at: number } };
 export type ChallengeFrame = {
-  bar: number; count: number; cuePitches: Set<number>; upcoming: Target[];
+  bar: number; count: number; cuePitches: Set<number>; upcoming: DrumCue[]; guideLines: Click[];
   eitherHand: boolean; feedback?: Feedback; perfectStreak: number;
 };
 
@@ -18,14 +20,17 @@ export class ChallengeFrames {
   private index: TargetIndex;
   private measures: { start: number; end: number; bar: number }[];
   private tempos: { time: number; position: number; bpm: number }[];
+  private beats: Click[];
   private leadIn;
   private previous?: ChallengeFrame;
   private cuePitches = new Set<number>();
-  private upcoming: Target[] = [];
+  private upcoming: DrumCue[] = [];
+  private guideLines: Click[] = [];
   constructor(timeline: Timeline, private targets: Target[], private speed: number, private drum: boolean, private preview: boolean) {
     this.index = new TargetIndex(targets);
     this.measures = timeline.score.measures.map(m => ({ start: value(m.start), end: value(add(m.start, m.duration)), bar: (m.sourceIndex ?? m.index) + 1 }));
     this.tempos = timeline.score.tempos.map(t => ({ time: secondsAt(timeline.score, t.position), position: value(t.position), bpm: t.bpm }));
+    this.beats = drum && preview ? metronomeClicks(timeline) : [];
     this.leadIn = countIn(timeline);
   }
   read(position: number, attempt?: Attempt, feedback?: Feedback): ChallengeFrame {
@@ -54,19 +59,31 @@ export class ChallengeFrames {
     const perfectStreak = attempt?.perfectStreak().current ?? 0;
     const cuePitches = this.cuePitches;
     const upcoming = this.upcoming;
+    const guideLines = this.guideLines;
     cuePitches.clear();
     upcoming.length = 0;
+    guideLines.length = 0;
     let eitherHand = false;
     if (this.preview) {
       if (this.drum) {
+        const from = position - DRUM_RUNOUT * this.speed;
+        const to = position + DRUM_LOOK_AHEAD * this.speed;
+        low = 0;
+        high = this.beats.length;
+        while (low < high) {
+          const middle = (low + high) >>> 1;
+          if (this.beats[middle].time < from) low = middle + 1;
+          else high = middle;
+        }
+        for (let i = low; i < this.beats.length && this.beats[i].time <= to; i++) {
+          guideLines.push(this.beats[i]);
+        }
         let next: Target | undefined;
-        for (let i = this.index.lowerBound(position - this.index.maxWindow * this.speed - 1e-8); i < this.targets.length; i++) {
+        for (let i = this.index.lowerBound(from); i < this.targets.length; i++) {
           const target = this.targets[i];
-          if (attempt?.isJudged(target.id)) continue;
-          if (target.time + target.window * this.speed >= position) next ??= target;
-          const remaining = (target.time - position) / this.speed;
-          if (remaining > DRUM_LOOK_AHEAD) break;
-          if (remaining >= -target.window) upcoming.push(target);
+          if (target.time + target.window * this.speed >= position && !attempt?.isJudged(target.id)) next ??= target;
+          if (target.time > to) break;
+          upcoming.push({ target, hit: attempt?.hit(target.id) });
         }
         eitherHand = next !== undefined && !next.hand;
       } else {
@@ -81,13 +98,18 @@ export class ChallengeFrames {
       }
     }
     const previous = this.previous;
-    const sameUpcoming = previous && previous.upcoming.length === upcoming.length && upcoming.every((t, i) => t === previous.upcoming[i]);
+    const sameUpcoming = previous && previous.upcoming.length === upcoming.length && upcoming.every(({ target, hit }, i) => {
+      const cue = previous.upcoming[i];
+      return target === cue.target && hit?.grade === cue.hit?.grade && hit?.at === cue.hit?.at;
+    });
+    const sameGuideLines = previous && previous.guideLines.length === guideLines.length && guideLines.every((line, i) => line === previous.guideLines[i]);
     const samePitches = previous && previous.cuePitches.size === cuePitches.size && this.samePitches(previous.cuePitches);
     if (previous && previous.bar === bar && previous.count === count && previous.feedback === visibleFeedback
       && previous.perfectStreak === perfectStreak && previous.eitherHand === eitherHand
-      && sameUpcoming && samePitches) return previous;
+      && sameUpcoming && sameGuideLines && samePitches) return previous;
     return this.previous = { bar, count, cuePitches: samePitches ? previous!.cuePitches : new Set(cuePitches),
-      upcoming: sameUpcoming ? previous!.upcoming : upcoming.slice(), eitherHand, feedback: visibleFeedback, perfectStreak };
+      upcoming: sameUpcoming ? previous!.upcoming : upcoming.slice(), guideLines: sameGuideLines ? previous!.guideLines : guideLines.slice(),
+      eitherHand, feedback: visibleFeedback, perfectStreak };
   }
   private samePitches(previous: Set<number>) {
     for (const pitch of this.cuePitches) if (!previous.has(pitch)) return false;

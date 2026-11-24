@@ -26,7 +26,7 @@ async function shortDrumScore(page: Page, scoreXml?: string) {
   });
 }
 
-async function strikeScheduled(page: Page, index: number, hand: 'L' | 'R', options: { keyboard?: boolean; repeat?: boolean; renderClock?: boolean } = {}) {
+async function strikeScheduled(page: Page, index: number, hand: 'L' | 'R', options: { keyboard?: boolean; repeat?: boolean; renderClock?: boolean; offset?: number } = {}) {
   await expect.poll(() => page.evaluate(() => {
     const data = (window as unknown as { drumAudio: { strikes: { scheduled: boolean }[] } }).drumAudio;
     return data.strikes.filter(s => s.scheduled).length;
@@ -44,7 +44,7 @@ async function strikeScheduled(page: Page, index: number, hand: 'L' | 'R', optio
       : new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', button: 0, pointerId: hand === 'L' ? 1 : 2 });
     // Firefox rounds event/clock timestamps; stay just after the first attack
     // rather than accidentally creating a free count-in tap a fraction early.
-    Object.defineProperty(event, 'timeStamp', { value: stamp + (options.renderClock ? 10 : 2) });
+    Object.defineProperty(event, 'timeStamp', { value: stamp + (options.renderClock ? 10 : 2) + (options.offset ?? 0) });
     document.querySelector(options.keyboard ? '.drum-board' : `[data-hand="${hand}"]`)!.dispatchEvent(event);
   }, { index, hand, options });
 }
@@ -141,7 +141,7 @@ test('cues off gives no prompts while wrong hands miss, either hands score, and 
   await page.getByLabel('Advance note cues').uncheck();
   await page.getByRole('button', { name: 'Start attempt' }).click();
   await expect(page.locator('.drum-note')).toHaveCount(0);
-  await expect(page.locator('.drum-hit-target, .drum-hit-label')).toHaveCount(0);
+  await expect(page.locator('.drum-bar-line, .drum-beat-line, .drum-strike-line, .drum-hit-target, .drum-hit-label')).toHaveCount(0);
   await page.screenshot({ path: path.join(tmpdir(), 'marching-band-drum-cues-off.png') });
   await strikeScheduled(page, 0, 'R');
   await expect(page.locator('.game-playing-status')).toContainText('Wrong hand');
@@ -206,6 +206,7 @@ test('falling bars exactly overlap their outlines at the scored onset across scr
   await page.goto('./#16obr/drum-challenge');
   await page.getByRole('button', { name: '100%', exact: true }).click();
   await page.getByLabel('Drum backing').check();
+  await expect(page.getByLabel('Metronome', { exact: false })).not.toBeChecked();
   await page.getByRole('button', { name: 'Start attempt' }).click();
 
   for (const index of [0, 2]) {
@@ -221,9 +222,12 @@ test('falling bars exactly overlap their outlines at the scored onset across scr
       const when = data.strikes.filter(s => s.scheduled)[index].when;
       data.context.getOutputTimestamp = () => ({ contextTime: when, performanceTime: performance.now() });
     }, index);
-    const note = page.locator(`.drum-note[data-time="${index / 2}"]`);
+    const time = index / 2;
+    const note = page.locator(`.drum-note[data-time="${time}"]`);
     const outline = page.locator(`.drum-hit-target.${index === 0 ? 'left' : 'either'}`);
+    const guide = page.locator(`.drum-${index === 0 ? 'bar' : 'beat'}-line[data-time="${time}"]`);
     await expect(outline).toBeVisible();
+    await expect(guide).toHaveCSS('border-top-color', index === 0 ? 'rgb(169, 190, 200)' : 'rgb(196, 211, 218)');
     for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 1440, height: 1000 }]) {
       await page.setViewportSize(viewport);
       await expect.poll(async () => {
@@ -233,6 +237,8 @@ test('falling bars exactly overlap their outlines at the scored onset across scr
       }, { intervals: [10] }).toBeLessThan(0.5);
       const bar = (await note.boundingBox())!;
       const target = (await outline.boundingBox())!;
+      const line = (await guide.boundingBox())!;
+      expect(line.y).toBeCloseTo(target.y + target.height / 2, 1);
       expect(bar.x).toBeCloseTo(target.x, 1);
       expect(bar.width).toBeCloseTo(target.width, 1);
       expect(bar.height).toBeCloseTo(target.height, 1);
@@ -243,6 +249,50 @@ test('falling bars exactly overlap their outlines at the scored onset across scr
     await page.screenshot({ path: path.join(tmpdir(), `marching-band-drum-hit-${index === 0 ? 'left' : 'either'}.png`) });
   }
   await page.getByRole('button', { name: 'Stop', exact: true }).click();
+});
+
+test('scored cues pop in their timing colour and stay where the strike landed', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await shortDrumScore(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('./#16obr/drum-challenge');
+  await page.getByRole('button', { name: '100%', exact: true }).click();
+  await page.getByLabel('Drum backing').check();
+  await page.getByRole('button', { name: 'Start attempt' }).click();
+
+  for (const { index, hand, offset, grade, colour } of [
+    { index: 0, hand: 'L', offset: 0, grade: 'perfect', colour: 'rgb(246, 207, 72)' },
+    { index: 1, hand: 'R', offset: -80, grade: 'good', colour: 'rgb(105, 223, 161)' },
+    { index: 2, hand: 'L', offset: 128, grade: 'okay', colour: 'rgb(248, 170, 98)' },
+  ] as const) {
+    await strikeScheduled(page, index, hand, { offset, keyboard: index === 0 });
+    const note = page.locator(`.drum-note[data-time="${index / 2}"][data-hit="${grade}"]`);
+    const face = note.locator('.drum-note-face');
+    await expect(face).toHaveCSS('background-color', colour);
+    await expect(face).toHaveCSS('animation-name', 'drum-note-pop');
+    const top = (await note.boundingBox())!.y;
+    const line = (await page.locator('.drum-strike-line').boundingBox())!;
+    const distance = top + 14 - line.y;
+    if (offset < 0) expect(distance).toBeLessThan(-2);
+    else if (offset > 0) expect(distance).toBeGreaterThan(2);
+    else expect(Math.abs(distance)).toBeLessThan(2);
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    expect((await note.boundingBox())!.y).toBeCloseTo(top, 1);
+    if (grade === 'perfect') {
+      await page.screenshot({ path: path.join(tmpdir(), 'marching-band-drum-perfect-desktop.png') });
+      await page.setViewportSize({ width: 390, height: 844 });
+    } else if (grade === 'okay') {
+      await page.screenshot({ path: path.join(tmpdir(), 'marching-band-drum-okay-phone.png') });
+    }
+  }
+
+  const missed = page.locator('.drum-note[data-time="1.5"][data-passed] .drum-note-face');
+  await expect(missed).toHaveCSS('background-color', 'rgb(196, 203, 208)');
+  await expect(missed).toHaveCSS('animation-name', 'none');
+  await expect(page.locator('.game-result-stats')).toHaveText('Perfect1Early / late2Missed1Extra / wrong0');
+  expect(errors).toEqual([]);
 });
 
 test('default muted backing generates no drum sources while live taps respond immediately', async ({ page }) => {
