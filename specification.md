@@ -133,24 +133,26 @@ Both modes share setup, count-in, progress, streaks, results, retry and interrup
 | Behaviour | Bell lyre | Drum |
 | --- | --- | --- |
 | Input | Touch, mouse or keyboard activation of pitched bars; simultaneous fingers supported. | Left/right pads using separate touch pointers, mouse, F/J or focused button activation. Held keys do not repeat. |
-| Advance cues | Bar outlines up to 0.8 seconds before an attack. | Falling bars with a two-second preview, matching left/right or a neutral Either lane. |
+| Advance cues | Bar outlines up to 0.8 seconds before an attack. | Falling notes with a two-second preview, matching left/right or a neutral Either lane. Measure lines scroll at the written bar boundaries in playback order. |
 | Accompaniment | Percussion remains audible; other pitched parts are muted. | Other parts remain audible. |
 | Selected part | Optional quieter automatic backing; every tap sounds its actual pitch independently. | Optional quieter drum backing; every tap sounds a snare strike independently. |
 
-Cues off removes attack prompts while retaining player-input feedback. No haptics are used. Ties require one strike, repeated attacks remain separate, and duplicate voices at the same pitch/hand and onset need one physical strike. Chords and simultaneous opposite-hand drum targets accept separate fingers. Either drum pad can claim an unspecified-hand attack. A wrong-hand strike consumes the expected attack as a miss, cannot be corrected, and receives no additional extra-tap penalty. Both strokes of a flam are targets.
+Cues off hides note cues, measure lines and note pops while retaining pad and timing feedback. No haptics are used. Ties require one strike, repeated attacks remain separate, and duplicate voices at the same pitch/hand and onset need one physical strike. Chords and simultaneous opposite-hand drum targets accept separate fingers. Either drum pad can claim an unspecified-hand attack. A wrong-hand strike consumes the expected attack as a miss, cannot be corrected, and receives no additional extra-tap penalty. Both strokes of a flam are targets.
 
 ### Judgement and results
 
 Input event timestamps are mapped to the same audio-output clock as the cues. Delayed event delivery can still receive credit for its original timestamp. Timing windows use real time at every speed and narrow to half the neighbouring onset gap in dense passages:
 
 - Perfect: within the smaller of ±65 ms or 65% of the target window; credit 1.
-- Close: within the smaller of ±100 ms or 80% of the window; credit 0.7.
-- Remaining accepted early/late hits: within the window, at most ±150 ms; credit 0.3.
+- Good: within the smaller of ±100 ms or 80% of the window; credit 0.7.
+- Okay: remaining accepted hits within the window, at most ±150 ms; credit 0.3.
 - Misses earn zero; wrong/extra taps deduct 0.25 points. A successful target cannot be claimed twice.
 
-Stars equal the rounded result of `10 × (total hit credit − extra-tap penalties) / expected attacks`, clamped to 0–10. Assistance does not reduce the available stars; settings are shown with the result. Perfect hits display brief positive feedback. A streak counter appears after three consecutive perfect attacks, with visual tiers at 10, 20 and 30. Other judgements and misses break the streak without negative text during play. Results include the longest perfect streak.
+Drum hits pop where the cue was when the tap landed. Perfect is gold, Good is green and Okay is amber. Unhit cues, including wrong-hand misses, turn grey as they pass the hit line and fade out. A valid late tap can still pop a grey cue. The drum status shows Perfect, Early, Late, Wrong hand or Extra tap as applicable. Bell lyre shows Perfect feedback. A streak counter appears after three consecutive perfect attacks, with visual tiers at 10, 20 and 30. Other judgements and misses break the streak.
 
-All ten star outlines appear immediately, then earned stars fill sequentially with ascending chimes. Result sounds can be disabled; reduced motion removes pop/spark animations. Results exist only in memory and are cleared on retry, navigation or reload. Stop returns to setup with the chosen settings. Backgrounding or losing audio interrupts an attempt without awarding a partial result.
+Stars equal the rounded result of `10 × (total hit credit − extra-tap penalties) / expected attacks`, clamped to 0–10. Assistance does not reduce available stars. Results show the settings, combined Early / late totals for Good and Okay hits, and longest perfect streak.
+
+All ten star outlines appear immediately, then earned stars fill sequentially with ascending chimes. Result sounds can be disabled. Reduced motion removes pop and spark animations while keeping the drum hit colours. Results exist only in memory and are cleared on retry, navigation or reload. Stop returns to setup with the chosen settings. Backgrounding or losing audio interrupts an attempt without awarding a partial result.
 
 Challenge frames read the audio clock without rerendering React on every animation frame. React updates on meaningful cue/feedback changes; progress updates ten times per second. Indexed target lookup, incremental missed-note expiry and cached resize-aware drum geometry bound work during play.
 
